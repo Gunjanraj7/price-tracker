@@ -7,7 +7,7 @@ The main entry point is fetch_product(): give it a link, get a ProductInfo.
     print(product.title, product.price)
 """
 
-from .errors import Blocked, FetchError, NetworkError, ParseError, UnsupportedSite
+from .errors import Blocked, FetchError, NetworkError, ParseError, TrackingError, UnsupportedSite
 from .fetch import fetch_product, new_client
 from .models import ProductInfo
 from .prices import format_rupees
@@ -18,6 +18,7 @@ __all__ = [
     "NetworkError",
     "ParseError",
     "ProductInfo",
+    "TrackingError",
     "UnsupportedSite",
     "fetch_product",
     "format_rupees",

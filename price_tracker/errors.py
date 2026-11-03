@@ -1,7 +1,11 @@
-"""Everything that can go wrong while fetching a price.
+"""Everything that can go wrong while fetching a price or tracking a product.
 
-Catch FetchError to handle all of them; the subclasses say what happened.
+Catch FetchError to handle all fetching problems; the subclasses say what happened.
 """
+
+
+class TrackingError(Exception):
+    """A tracking request that can't be done, like adding a product twice."""
 
 
 class FetchError(Exception):

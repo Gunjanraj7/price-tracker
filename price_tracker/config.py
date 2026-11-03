@@ -15,3 +15,18 @@ PAUSE_BETWEEN_PRODUCTS = 3.0
 
 # Pages the fetcher could not read are saved here, so you can see what changed.
 DEBUG_DIR = Path(__file__).resolve().parent.parent / "debug"
+
+# The database with your tracked products, their price history and alerts.
+DB_PATH = Path(__file__).resolve().parent.parent / "price_tracker.db"
+
+# Alert when the price is at or below your target, or at most this many
+# percent above it.
+NEAR_TARGET_PERCENT = 5
+
+# Alert when the price is this many percent below its usual price: the
+# middle price of the checks in the last BIG_DROP_DAYS days.
+BIG_DROP_PERCENT = 30
+BIG_DROP_DAYS = 30
+
+# Don't repeat an alert for this many days, unless the price falls further.
+ALERT_REPEAT_DAYS = 7
