@@ -44,8 +44,8 @@ Every `check` saves the price of each listing and makes an alert when:
   not the store's M.R.P. discount.
 
 The same alert isn't repeated for 7 days unless the price falls further. All
-these numbers are in `config.py`. `check` is meant to run twice a day; nothing
-runs it automatically yet.
+these numbers are in `config.py`. To run `check` by itself every day, see
+[Daily checks](#daily-checks).
 
 ## Telegram alerts
 
@@ -70,6 +70,33 @@ Telegram, with the product link. Without it, alerts only show in the terminal.
 The token lets anyone control your bot: keep it in the environment variable,
 never in the code or in Git. If an alert can't be sent, `check` says why and
 tries it again next time, for up to 24 hours.
+
+To stop the messages, mute the bot in Telegram, or delete the
+`TELEGRAM_BOT_TOKEN` variable to turn Telegram alerts off altogether.
+
+## Daily checks
+
+On Windows, this makes Task Scheduler run `check` every day at 9:00 AM and 9:00 PM:
+
+```
+.venv\Scripts\python.exe -m price_tracker schedule on               # turn on (9:00 and 21:00)
+.venv\Scripts\python.exe -m price_tracker schedule on 8:30 20:30    # or at other times
+.venv\Scripts\python.exe -m price_tracker schedule                  # is it on? next and last check
+.venv\Scripts\python.exe -m price_tracker schedule off              # turn off
+```
+
+- It runs `pythonw.exe -m price_tracker check --log`, so no window opens. What
+  each check prints is added to `logs/check.log`; look there if something
+  seems wrong.
+- It runs as you while you're signed in to Windows (a locked screen is fine),
+  so it needs no password and sends Telegram alerts like a check you run yourself.
+- Nothing runs while the PC is off or asleep. A missed check runs as soon as
+  the PC is back, once, however many were missed.
+- It works on battery too. You can also see the task, called *Price Tracker
+  check*, in the Task Scheduler app.
+
+On macOS or Linux, run `python -m price_tracker check --log` from cron instead,
+for example `0 9,21 * * *`, from the project folder.
 
 ## Database
 
@@ -103,8 +130,9 @@ Tracking from code is in `tracking.py`: `track()`, `check_all()`, `set_target()`
 .venv\Scripts\python.exe -m pytest
 ```
 
-The tests are offline and use the sample pages in `tests/pages/` and a fake
-Telegram server. They never message your real bot, even when it's set up.
+The tests are offline and use the sample pages in `tests/pages/`, a fake
+Telegram server and a fake Task Scheduler. They never message your real bot
+or change your scheduled tasks.
 
 ## Layout
 
@@ -120,9 +148,10 @@ price_tracker/
     tracking.py      adding products, checking them, making alerts
     alerts.py        the alert rules: near target, big drop
     notify.py        sending alerts to Telegram
-    errors.py        FetchError and its subclasses, TrackingError, NotifyError
+    scheduler.py     the daily check, with Windows Task Scheduler
+    errors.py        FetchError and its subclasses, TrackingError, NotifyError, ScheduleError
     prices.py        reading "₹1,299.00" and writing ₹1,29,999
-    config.py        timeouts, retries, pauses, alert limits, debug folder
+    config.py        timeouts, retries, pauses, alert limits, check times, file locations
     stores/
         __init__.py  the list of stores
         common.py    helpers every store uses (CAPTCHA check, schema.org data)

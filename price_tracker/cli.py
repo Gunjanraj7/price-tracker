@@ -8,11 +8,15 @@ Usage, from the project folder:
                                                      starts tracking a product
     python -m price_tracker add "<link>" --to ITEM   adds another store's page to item ITEM
     python -m price_tracker list                     shows tracked items and their latest prices
-    python -m price_tracker check                    checks every tracked item now and shows alerts
+    python -m price_tracker check [--log]            checks every tracked item now and shows alerts
+                                                     (--log: adds the output to logs/check.log instead)
     python -m price_tracker target ITEM PRICE        changes an item's target price ("off" removes it)
     python -m price_tracker remove ITEM              stops tracking an item and deletes its history
     python -m price_tracker telegram                 sets up Telegram alerts: finds your chat ID,
                                                      then sends a test message
+    python -m price_tracker schedule on [TIME ...]   checks every day at 9:00 and 21:00, or the TIMEs
+    python -m price_tracker schedule off             stops the daily checks
+    python -m price_tracker schedule                 says whether daily checks are on
 
 Tracked items are saved in price_tracker.db, in the project folder. When
 Telegram is set up, `add` and `check` also send their alerts there.
@@ -27,20 +31,25 @@ import re
 import sqlite3
 import sys
 import time
-from contextlib import closing
+import traceback
+from contextlib import closing, redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from textwrap import shorten
 
 import httpx
 
-from . import config, db, notify, tracking
-from .errors import FetchError, NotifyError, TrackingError
+from . import config, db, notify, scheduler, tracking
+from .errors import FetchError, NotifyError, ScheduleError, TrackingError
 from .fetch import fetch_product, new_client
 from .models import Item, Listing
 from .prices import format_rupees, parse_price
 
-COMMANDS = ("add", "list", "check", "target", "remove", "telegram", "-h", "--help")
+COMMANDS = ("add", "list", "check", "target", "remove", "telegram", "schedule", "-h", "--help")
+
+# How each logged run starts and ends in the log file.
+LOG_START = "=== check at "
+LOG_END = "=== finished: "
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -102,6 +111,14 @@ def price_arg(text: str) -> Decimal | None:
     return price
 
 
+def time_arg(text: str):
+    """Read a time of day typed on the command line, like 9:00 or 21:30."""
+    try:
+        return scheduler.parse_time(text)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m price_tracker",
@@ -116,7 +133,10 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--to", type=int, metavar="ITEM", help="add the link to item ITEM, e.g. its page on the other store")
 
     commands.add_parser("list", help="show tracked items and their latest prices")
-    commands.add_parser("check", help="check every tracked item now and show alerts")
+    check = commands.add_parser("check", help="check every tracked item now and show alerts")
+    check.add_argument(
+        "--log", action="store_true", help="add the output to logs/check.log instead of showing it (the daily check uses this)"
+    )
 
     target = commands.add_parser("target", help="change an item's target price")
     target.add_argument("item", type=int)
@@ -126,6 +146,13 @@ def build_parser() -> argparse.ArgumentParser:
     remove.add_argument("item", type=int)
 
     commands.add_parser("telegram", help="set up Telegram alerts: find your chat ID, then send a test message")
+
+    schedule = commands.add_parser("schedule", help="check prices every day, with Windows Task Scheduler")
+    schedule.add_argument("action", nargs="?", choices=("on", "off"), help="leave it out to see whether daily checks are on")
+    schedule.add_argument(
+        "times", nargs="*", type=time_arg, metavar="TIME",
+        help=f"with on: when to check, e.g. 8:30 20:30 (default: {' '.join(config.CHECK_TIMES)})",
+    )
     return parser
 
 
@@ -266,9 +293,82 @@ def telegram_setup() -> int:
     return 0
 
 
+def schedule_command(args: argparse.Namespace) -> int:
+    """Turn the daily checks on or off, or say whether they're on."""
+    if args.times and args.action != "on":
+        print("Error:    times only go with on, like: schedule on 9:00 21:00")
+        return 1
+    try:
+        if args.action == "on":
+            times = args.times or [scheduler.parse_time(text) for text in config.CHECK_TIMES]
+            scheduler.turn_on(times)
+            print(f"Daily checks are on: every day at {scheduler.describe(times)}.")
+            print(f"Each check adds what it found to {config.LOG_PATH}")
+            print("Turn them off with: python -m price_tracker schedule off")
+            return 0
+        if args.action == "off":
+            print("Daily checks are off." if scheduler.turn_off() else "Daily checks were already off.")
+            return 0
+        times = scheduler.scheduled_times()
+    except ScheduleError as error:
+        print(f"Error:    {error}")
+        return 1
+
+    if times is None:
+        print("Daily checks are off. Turn them on with: python -m price_tracker schedule on")
+        return 0
+    if not times:
+        print("The daily check task is there but has no times. Run: python -m price_tracker schedule on")
+        return 1
+    upcoming = scheduler.next_run(times, datetime.now())
+    print(f"Daily checks are on: every day at {scheduler.describe(times)}.")
+    print(f"Next check: {upcoming:%d %b, %I:%M %p}")
+    print(f"Last check: {last_logged_check() or 'none yet'}")
+    print(f"Log:        {config.LOG_PATH}")
+    return 0
+
+
+def run_logged(args: argparse.Namespace) -> int:
+    """Run a command, adding what it prints to config.LOG_PATH instead of showing it.
+
+    The daily check runs like this, under pythonw.exe, which has no screen to print to.
+    """
+    log_path = config.LOG_PATH
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if log_path.exists() and log_path.stat().st_size > config.LOG_MAX_BYTES:
+        log_path.replace(log_path.with_name(log_path.name + ".old"))
+
+    with open(log_path, "a", encoding="utf-8") as log, redirect_stdout(log), redirect_stderr(log):
+        print(f"{LOG_START}{db.utc_now().astimezone(IST):%d %b %Y, %I:%M %p} ===")
+        try:
+            code = run(args)
+        except Exception:
+            traceback.print_exc()
+            code = 1
+        print(f"{LOG_END}{'everything worked' if code == 0 else 'something went wrong, see above'} ===\n")
+    return code
+
+
+def last_logged_check() -> str | None:
+    """When the last logged check ran and how it went: '05 Nov 2026, 09:00 PM (everything worked)'."""
+    try:
+        lines = config.LOG_PATH.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return None
+    started = result = None
+    for line in lines:
+        if line.startswith(LOG_START):
+            started, result = line.removeprefix(LOG_START).removesuffix(" ==="), "still running, or stopped early"
+        elif line.startswith(LOG_END) and started:
+            result = line.removeprefix(LOG_END).removesuffix(" ===")
+    return f"{started} ({result})" if started else None
+
+
 def run(args: argparse.Namespace) -> int:
     if args.command == "telegram":
         return telegram_setup()
+    if args.command == "schedule":
+        return schedule_command(args)
 
     with closing(db.connect()) as conn:
         try:
@@ -295,9 +395,12 @@ def run(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
-    # Windows terminals can choke on the ₹ sign without this.
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # Windows terminals can choke on the ₹ sign without this. Under pythonw.exe,
+    # as the daily check runs, there is no terminal at all.
+    if sys.stdout is not None:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     if args and args[0] in COMMANDS:
-        return run(build_parser().parse_args(args))
+        parsed = build_parser().parse_args(args)
+        return run_logged(parsed) if getattr(parsed, "log", False) else run(parsed)
     return show_links(args)

@@ -12,6 +12,10 @@ class NotifyError(Exception):
     """An alert could not be sent, or Telegram isn't set up right."""
 
 
+class ScheduleError(Exception):
+    """The scheduled check could not be turned on or off."""
+
+
 class FetchError(Exception):
     """Base class for everything that can go wrong while fetching a price."""
 

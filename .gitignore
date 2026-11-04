@@ -2,5 +2,6 @@
 __pycache__/
 .pytest_cache/
 debug/
+logs/
 *.db
 *.db-journal

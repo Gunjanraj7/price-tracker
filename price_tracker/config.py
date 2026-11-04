@@ -13,11 +13,22 @@ RETRY_DELAY = 5.0
 # Wait between products when checking several, so the stores don't block us.
 PAUSE_BETWEEN_PRODUCTS = 3.0
 
+# The project folder, which has the price_tracker package in it.
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+
 # Pages the fetcher could not read are saved here, so you can see what changed.
-DEBUG_DIR = Path(__file__).resolve().parent.parent / "debug"
+DEBUG_DIR = PROJECT_DIR / "debug"
 
 # The database with your tracked products, their price history and alerts.
-DB_PATH = Path(__file__).resolve().parent.parent / "price_tracker.db"
+DB_PATH = PROJECT_DIR / "price_tracker.db"
+
+# When `schedule on` checks prices, every day, unless you give other times.
+CHECK_TIMES = ("09:00", "21:00")
+
+# What the scheduled checks print goes here. When it grows past LOG_MAX_BYTES
+# it's renamed to check.log.old (replacing the older one) and a new log starts.
+LOG_PATH = PROJECT_DIR / "logs" / "check.log"
+LOG_MAX_BYTES = 1_000_000
 
 # Alert when the price is at or below your target, or at most this many
 # percent above it.

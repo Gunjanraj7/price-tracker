@@ -6,12 +6,13 @@ November 2026), cut down to the parts the fetcher reads.
 """
 
 import json
+import subprocess
 from pathlib import Path
 
 import httpx
 import pytest
 
-from price_tracker import config, notify
+from price_tracker import config, notify, scheduler
 
 PAGES = Path(__file__).parent / "pages"
 
@@ -35,6 +36,48 @@ def no_telegram(monkeypatch):
     """Tests never message the real Telegram, even on a computer where it's set up."""
     monkeypatch.delenv(notify.TOKEN_VARIABLE, raising=False)
     monkeypatch.delenv(notify.CHAT_VARIABLE, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def no_task_scheduler(monkeypatch, tmp_path):
+    """Tests never change the real Task Scheduler, and log to a temporary folder."""
+
+    def refuse(args):
+        raise AssertionError(f"a test ran the real schtasks {args}; use the task_scheduler fixture")
+
+    monkeypatch.setattr(scheduler, "_run_schtasks", refuse)
+    monkeypatch.setattr(config, "LOG_PATH", tmp_path / "logs" / "check.log")
+
+
+class FakeTaskScheduler:
+    """A stand-in for Windows' schtasks tool. `tasks` maps task names to their XML."""
+
+    def __init__(self):
+        self.tasks = {}
+        self.refusal = None     # set to an error message to make the next /Create fail
+
+    def run(self, args):
+        command, name = args[0], args[args.index("/TN") + 1]
+        if command == "/Create":
+            if self.refusal:
+                return subprocess.CompletedProcess(args, 1, b"", f"ERROR: {self.refusal}\r\r\n".encode())
+            self.tasks[name] = Path(args[args.index("/XML") + 1]).read_text(encoding="utf-16")
+            return subprocess.CompletedProcess(args, 0, b"SUCCESS: The scheduled task was created.\r\r\n", b"")
+        if name not in self.tasks:
+            return subprocess.CompletedProcess(args, 1, b"", b"ERROR: The system cannot find the file specified.\r\r\n")
+        if command == "/Query":
+            return subprocess.CompletedProcess(args, 0, self.tasks[name].encode(), b"")
+        del self.tasks[name]
+        return subprocess.CompletedProcess(args, 0, b"SUCCESS: The scheduled task was deleted.\r\r\n", b"")
+
+
+@pytest.fixture
+def task_scheduler(monkeypatch):
+    """Use a fake Task Scheduler, as if on Windows. Returns it, to see the tasks."""
+    fake = FakeTaskScheduler()
+    monkeypatch.setattr(scheduler, "ON_WINDOWS", True)
+    monkeypatch.setattr(scheduler, "_run_schtasks", fake.run)
+    return fake
 
 
 class FakeTelegram:
