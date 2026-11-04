@@ -6,11 +6,9 @@ from sqlalchemy import text
 
 from price_tracker import db, tracking
 from price_tracker.errors import Blocked, TrackingError
-from price_tracker.models import ProductInfo
 
 AMAZON = "https://www.amazon.in/dp/B0D3DK779N"
 FLIPKART = "https://www.flipkart.com/boat-airdopes-131/p/itma0ea2cce3d648?pid=ACCHDYCG92CUSJFT"
-IDS = {AMAZON: ("amazon", "B0D3DK779N"), FLIPKART: ("flipkart", "ACCHDYCG92CUSJFT")}
 
 START = datetime(2026, 11, 4, 3, 30, tzinfo=timezone.utc)   # 9 AM in India
 HALF_DAY = timedelta(hours=12)
@@ -20,22 +18,6 @@ HALF_DAY = timedelta(hours=12)
 def session():
     with db.connect("sqlite://") as session:
         yield session
-
-
-@pytest.fixture
-def store(monkeypatch):
-    """Set each link's price now: store[AMAZON] = "999", None when sold out, or an error to raise."""
-    prices = {}
-
-    def fetch(link, client=None):
-        answer = prices[link]
-        if isinstance(answer, Exception):
-            raise answer
-        price = None if answer is None else Decimal(answer)
-        return ProductInfo(*IDS[link], link, "boAt Airdopes 131", price, "INR", price is not None)
-
-    monkeypatch.setattr(tracking, "fetch_product", fetch)
-    return prices
 
 
 def check_at(session, moment):

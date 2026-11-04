@@ -8,9 +8,11 @@ The main entry point is fetch_product(): give it a link, get a ProductInfo.
 """
 
 from .errors import (
+    AlreadyTracked,
     Blocked,
     FetchError,
     NetworkError,
+    NotFound,
     NotifyError,
     ParseError,
     ScheduleError,
@@ -22,9 +24,11 @@ from .models import ProductInfo
 from .prices import format_rupees
 
 __all__ = [
+    "AlreadyTracked",
     "Blocked",
     "FetchError",
     "NetworkError",
+    "NotFound",
     "NotifyError",
     "ParseError",
     "ProductInfo",

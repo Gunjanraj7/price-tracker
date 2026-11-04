@@ -17,6 +17,7 @@ Usage, from the project folder:
     python -m price_tracker schedule on [TIME ...]   checks every day at 9:00 and 21:00, or the TIMEs
     python -m price_tracker schedule off             stops the daily checks
     python -m price_tracker schedule                 says whether daily checks are on
+    python -m price_tracker serve [--port 8000]      runs the web API; try it at http://127.0.0.1:8000/docs
 
 Tracked items are saved in price_tracker.db, in the project folder. When
 Telegram is set up, `add` and `check` also send their alerts there.
@@ -45,7 +46,7 @@ from .fetch import fetch_product, new_client
 from .models import Item, Listing
 from .prices import format_rupees, parse_price
 
-COMMANDS = ("add", "list", "check", "target", "remove", "telegram", "schedule", "-h", "--help")
+COMMANDS = ("add", "list", "check", "target", "remove", "telegram", "schedule", "serve", "-h", "--help")
 
 # How each logged run starts and ends in the log file.
 LOG_START = "=== check at "
@@ -153,6 +154,14 @@ def build_parser() -> argparse.ArgumentParser:
         "times", nargs="*", type=time_arg, metavar="TIME",
         help=f"with on: when to check, e.g. 8:30 20:30 (default: {' '.join(config.CHECK_TIMES)})",
     )
+
+    serve = commands.add_parser("serve", help="run the web API; try it at http://127.0.0.1:8000/docs")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument(
+        "--host", default="127.0.0.1",
+        help="who can reach it: 127.0.0.1 (the default) is only this computer. There are no logins yet.",
+    )
+    serve.add_argument("--reload", action="store_true", help="restart when the code changes, while developing")
     return parser
 
 
@@ -364,11 +373,24 @@ def last_logged_check() -> str | None:
     return f"{started} ({result})" if started else None
 
 
+def serve(args: argparse.Namespace) -> int:
+    """Run the web API until Ctrl+C."""
+    import uvicorn    # only here: loading the web server takes a moment
+
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        print("Warning:  other computers can reach the API, and it has no logins yet.")
+    print(f"Web API:  http://{args.host}:{args.port}/docs to try it. Ctrl+C stops it.")
+    uvicorn.run("price_tracker.api:app", host=args.host, port=args.port, reload=args.reload)
+    return 0
+
+
 def run(args: argparse.Namespace) -> int:
     if args.command == "telegram":
         return telegram_setup()
     if args.command == "schedule":
         return schedule_command(args)
+    if args.command == "serve":
+        return serve(args)
 
     with db.connect() as session:
         try:

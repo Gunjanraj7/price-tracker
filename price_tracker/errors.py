@@ -8,6 +8,14 @@ class TrackingError(Exception):
     """A tracking request that can't be done, like adding a product twice."""
 
 
+class NotFound(TrackingError):
+    """There is no item with that number."""
+
+
+class AlreadyTracked(TrackingError):
+    """The product is tracked already."""
+
+
 class NotifyError(Exception):
     """An alert could not be sent, or Telegram isn't set up right."""
 

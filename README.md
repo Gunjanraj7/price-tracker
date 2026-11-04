@@ -98,6 +98,40 @@ On Windows, this makes Task Scheduler run `check` every day at 9:00 AM and 9:00 
 On macOS or Linux, run `python -m price_tracker check --log` from cron instead,
 for example `0 9,21 * * *`, from the project folder.
 
+## Web API
+
+A [FastAPI](https://fastapi.tiangolo.com/) web API does what the command line
+does, for the web UI or anything else:
+
+```
+.venv\Scripts\python.exe -m price_tracker serve      # then open http://127.0.0.1:8000/docs
+```
+
+`/docs` lists every endpoint and lets you try them in the browser.
+
+| Endpoint | Does |
+|----------|------|
+| `GET /api/items` | tracked items, with their latest price on each store |
+| `POST /api/items` | start tracking a link: `{"link": "...", "target_price": 1500, "name": "..."}` (target and name optional) |
+| `GET /api/items/{id}` | one item |
+| `PATCH /api/items/{id}` | change the target: `{"target_price": 1200}`, or `null` to remove it |
+| `DELETE /api/items/{id}` | stop tracking an item and delete its history |
+| `POST /api/items/{id}/listings` | add the other store's page: `{"link": "..."}` |
+| `POST /api/items/{id}/check` | check the item's prices now |
+| `GET /api/items/{id}/history?days=30` | the recorded prices, oldest first, for a chart |
+| `GET /api/alerts?limit=50` | the newest alerts |
+| `GET /api/health` | `{"status": "ok"}` when it's running |
+
+Prices are rupees as JSON numbers and times are ISO 8601 in UTC. Errors come
+back as `{"detail": "..."}`: 404 for an item that doesn't exist, 409 for a
+product that's already tracked, 422 for a link or value that can't be used,
+and 502 when the store refused or couldn't be read (try again later). Adding
+and checking read the store pages, so they take a few seconds. New alerts go
+to Telegram as with the command line.
+
+There are no logins yet, so it only listens on this computer (127.0.0.1).
+`--port` changes the port, and `--reload` restarts it when the code changes.
+
 ## Database
 
 Everything is saved in `price_tracker.db` (SQLite) in the project folder. The
@@ -163,6 +197,8 @@ price_tracker/
     __init__.py      what other code imports: fetch_product, ProductInfo, errors
     __main__.py      makes `python -m price_tracker` work
     cli.py           the command line (commands, printing, asking for links)
+    api.py           the web API (FastAPI): endpoints and how errors are answered
+    schemas.py       the shapes of the API's requests and answers
     fetch.py         downloads a page, retries, hands it to the right store
     links.py         finds the link in pasted text and works out the store
     models.py        ProductInfo, PageDetails, and the tables: Item, Listing, PriceCheck, Alert
@@ -172,7 +208,7 @@ price_tracker/
     alerts.py        the alert rules: near target, big drop
     notify.py        sending alerts to Telegram
     scheduler.py     the daily check, with Windows Task Scheduler
-    errors.py        FetchError and its subclasses, TrackingError, NotifyError, ScheduleError
+    errors.py        FetchError, TrackingError and their subclasses, NotifyError, ScheduleError
     prices.py        reading "₹1,299.00" and writing ₹1,29,999
     config.py        timeouts, retries, pauses, alert limits, check times, file locations
     stores/

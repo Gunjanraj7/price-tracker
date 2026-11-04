@@ -7,12 +7,14 @@ November 2026), cut down to the parts the fetcher reads.
 
 import json
 import subprocess
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
 import pytest
 
-from price_tracker import config, notify, scheduler
+from price_tracker import config, notify, scheduler, tracking
+from price_tracker.models import ProductInfo
 
 PAGES = Path(__file__).parent / "pages"
 
@@ -21,6 +23,30 @@ PAGES = Path(__file__).parent / "pages"
 def page():
     """Load a sample page from tests/pages by file name."""
     return lambda name: (PAGES / name).read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def store(monkeypatch):
+    """Set the price each link has now, instead of fetching it.
+
+    store[link] = "999" sets the price, None makes it sold out, and an error
+    (like Blocked(...)) is raised. The links are the earbuds' pages below.
+    """
+    ids = {
+        "https://www.amazon.in/dp/B0D3DK779N": ("amazon", "B0D3DK779N"),
+        "https://www.flipkart.com/boat-airdopes-131/p/itma0ea2cce3d648?pid=ACCHDYCG92CUSJFT": ("flipkart", "ACCHDYCG92CUSJFT"),
+    }
+    prices = {}
+
+    def fetch(link, client=None):
+        answer = prices[link]
+        if isinstance(answer, Exception):
+            raise answer
+        price = None if answer is None else Decimal(answer)
+        return ProductInfo(*ids[link], link, "boAt Airdopes 131", price, "INR", price is not None)
+
+    monkeypatch.setattr(tracking, "fetch_product", fetch)
+    return prices
 
 
 @pytest.fixture(autouse=True)

@@ -2,6 +2,7 @@ import sys
 from datetime import datetime
 
 import pytest
+import uvicorn
 
 from price_tracker import cli, config
 
@@ -187,6 +188,20 @@ def test_schedule_times_only_go_with_on(run, task_scheduler):
 def test_schedule_reports_task_scheduler_errors(run, task_scheduler):
     task_scheduler.refusal = "Access is denied."
     assert run("schedule", "on") == (1, "Error:    Task Scheduler said: Access is denied.\n")
+
+
+def test_serve_runs_the_api_on_this_computer(run, monkeypatch):
+    calls = []
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    code, out = run("serve")
+    assert code == 0
+    assert calls == [(("price_tracker.api:app",), {"host": "127.0.0.1", "port": 8000, "reload": False})]
+    assert out == "Web API:  http://127.0.0.1:8000/docs to try it. Ctrl+C stops it.\n"
+
+    code, out = run("serve", "--host", "0.0.0.0", "--port", "9000")
+    assert calls[-1][1]["host"] == "0.0.0.0"
+    assert out.startswith("Warning:  other computers can reach the API, and it has no logins yet.")
 
 
 def test_telegram_setup_reports_a_wrong_token(run, telegram, monkeypatch):

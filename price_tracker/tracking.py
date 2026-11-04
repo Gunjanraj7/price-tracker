@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from . import config, db
 from .alerts import find_alerts
-from .errors import FetchError, TrackingError
+from .errors import AlreadyTracked, FetchError, NotFound
 from .fetch import fetch_product
 from .models import Item, Listing, ProductInfo
 from .prices import format_rupees
@@ -50,14 +50,14 @@ def track(
     This makes a new item, called `name` (the store's title by default).
     Give `item_id` to add the link to an item you already track instead, like
     the Flipkart page of a product you track on Amazon. `target` sets the
-    item's target price. Raises TrackingError if the item doesn't exist or
-    the product is already tracked, and FetchError if the page can't be read.
+    item's target price. Raises NotFound if the item doesn't exist,
+    AlreadyTracked if the product is, and FetchError if the page can't be read.
     """
-    item = None if item_id is None else _item(session, item_id)
+    item = None if item_id is None else find_item(session, item_id)
     product = fetch_product(link, client)
     existing = db.find_listing(session, product.site, product.product_id)
     if existing:
-        raise TrackingError(f"This product is already tracked, as item {existing.item_id}.")
+        raise AlreadyTracked(f"This product is already tracked, as item {existing.item_id}.")
 
     now = now or db.utc_now()
     with db.transaction(session):
@@ -83,32 +83,41 @@ def check(session: Session, listing: Listing, client: httpx.Client, now: datetim
         return _save(session, listing, product, now)
 
 
-def check_all(session: Session, client: httpx.Client, now: datetime | None = None) -> Iterator[Check]:
-    """Check every listing of the active items, saving each result as it comes in."""
-    for number, listing in enumerate(db.listings_to_check(session)):
+def check_listings(
+    session: Session, listings: list[Listing], client: httpx.Client, now: datetime | None = None
+) -> Iterator[Check]:
+    """Check these listings one by one, pausing in between, saving each result as it comes in."""
+    for number, listing in enumerate(listings):
         if number:
             time.sleep(config.PAUSE_BETWEEN_PRODUCTS)
         yield check(session, listing, client, now)
 
 
-def set_target(session: Session, item_id: int, target: Decimal | None) -> None:
+def check_all(session: Session, client: httpx.Client, now: datetime | None = None) -> Iterator[Check]:
+    """Check every listing of the active items."""
+    return check_listings(session, db.listings_to_check(session), client, now)
+
+
+def set_target(session: Session, item_id: int, target: Decimal | None) -> Item:
     """Change an item's target price; None removes it."""
-    item = _item(session, item_id)
+    item = find_item(session, item_id)
     with db.transaction(session):
         item.target_price = target
+    return item
 
 
 def untrack(session: Session, item_id: int) -> None:
     """Stop tracking an item, and delete its price history and alerts."""
-    item = _item(session, item_id)
+    item = find_item(session, item_id)
     with db.transaction(session):
         session.delete(item)
 
 
-def _item(session: Session, item_id: int) -> Item:
+def find_item(session: Session, item_id: int) -> Item:
+    """The item with this number. Raises NotFound if there's none."""
     item = db.get_item(session, item_id)
     if item is None:
-        raise TrackingError(f"There is no item {item_id}.")
+        raise NotFound(f"There is no item {item_id}.")
     return item
 
 

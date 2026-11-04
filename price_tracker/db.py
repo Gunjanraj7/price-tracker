@@ -20,7 +20,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from sqlalchemy import URL, Engine, create_engine, event, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from . import config
@@ -42,8 +42,12 @@ def make_engine(url: str | URL | None = None, upgrade: bool = True) -> Engine:
     new database in memory, which tests use.
     """
     url = database_url() if url is None else url
-    in_memory = str(url) in ("sqlite://", "sqlite:///:memory:")
-    engine = create_engine(url, poolclass=StaticPool) if in_memory else create_engine(url)
+    if str(url) in ("sqlite://", "sqlite:///:memory:"):
+        # One shared connection, or each would get its own empty database. The web
+        # API uses it from several threads, which SQLite allows only when asked.
+        engine = create_engine(url, poolclass=StaticPool, connect_args={"check_same_thread": False})
+    else:
+        engine = create_engine(url)
     if engine.dialect.name == "sqlite":
         # SQLite only enforces foreign keys, and so deletes an item's listings with it, when asked to.
         event.listen(engine, "connect", lambda connection, _: connection.execute("PRAGMA foreign_keys = ON"))
@@ -78,6 +82,11 @@ def connect(url: str | URL | None = None) -> Session:
     return _ClosingSession(make_engine(url), expire_on_commit=False)
 
 
+def session_maker(engine: Engine) -> sessionmaker[Session]:
+    """Makes sessions on an engine you keep open, like the web API's, one per request."""
+    return sessionmaker(engine, expire_on_commit=False)
+
+
 @contextmanager
 def transaction(session: Session) -> Iterator[None]:
     """Commit the changes made inside, or undo them all if something fails."""
@@ -107,7 +116,8 @@ def get_item(session: Session, item_id: int) -> Item | None:
 
 
 def all_items(session: Session) -> list[Item]:
-    return list(session.scalars(select(Item).order_by(Item.id)))
+    """Every item, with its listings."""
+    return list(session.scalars(select(Item).options(selectinload(Item.listings)).order_by(Item.id)))
 
 
 # Listings
@@ -171,6 +181,16 @@ def prices_since(session: Session, listing: Listing, since: datetime) -> list[De
     return list(session.scalars(query))
 
 
+def checks_since(session: Session, listing: Listing, since: datetime) -> list[PriceCheck]:
+    """Every successful check of a listing from `since` on, oldest first, sold out or not."""
+    query = (
+        select(PriceCheck)
+        .where(PriceCheck.listing_id == listing.id, PriceCheck.checked_at >= since)
+        .order_by(PriceCheck.checked_at, PriceCheck.id)
+    )
+    return list(session.scalars(query))
+
+
 # Alerts
 
 def add_alert(
@@ -195,5 +215,16 @@ def unsent_alerts(session: Session, since: datetime) -> list[Alert]:
         .options(joinedload(Alert.listing))
         .where(Alert.sent_at.is_(None), Alert.created_at >= since)
         .order_by(Alert.id)
+    )
+    return list(session.scalars(query))
+
+
+def recent_alerts(session: Session, limit: int) -> list[Alert]:
+    """The newest alerts first, with their listings and items."""
+    query = (
+        select(Alert)
+        .options(joinedload(Alert.listing).joinedload(Listing.item))
+        .order_by(Alert.created_at.desc(), Alert.id.desc())
+        .limit(limit)
     )
     return list(session.scalars(query))
