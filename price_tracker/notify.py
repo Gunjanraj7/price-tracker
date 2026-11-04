@@ -10,16 +10,16 @@ The token lets anyone control your bot, so keep it out of the code and out of Gi
     telegram = notify.from_environment()    # None when Telegram isn't set up
     if telegram:
         with telegram:
-            notify.send_alerts(conn, telegram)
+            notify.send_alerts(session, telegram)
 """
 
 import os
-import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import httpx
+from sqlalchemy.orm import Session
 
 from . import config, db
 from .errors import NotifyError
@@ -127,7 +127,7 @@ def from_environment() -> Telegram | None:
     return Telegram(token, chat_id, new_client())
 
 
-def send_alerts(conn: sqlite3.Connection, telegram: Telegram, now: datetime | None = None) -> int:
+def send_alerts(session: Session, telegram: Telegram, now: datetime | None = None) -> int:
     """Send the alerts that haven't been sent yet, each with its product link, and mark them sent.
 
     Returns how many were sent. Alerts older than config.SEND_ALERTS_WITHIN_HOURS
@@ -135,11 +135,11 @@ def send_alerts(conn: sqlite3.Connection, telegram: Telegram, now: datetime | No
     failure and raises NotifyError; the rest are tried again next time.
     """
     now = now or db.utc_now()
-    pending = db.unsent_alerts(conn, now - timedelta(hours=config.SEND_ALERTS_WITHIN_HOURS))
+    pending = db.unsent_alerts(session, now - timedelta(hours=config.SEND_ALERTS_WITHIN_HOURS))
     for number, alert in enumerate(pending):
         if number:
             time.sleep(config.PAUSE_BETWEEN_MESSAGES)
-        telegram.send(f"{alert.message}\n{alert.url}")
-        with conn:
-            db.mark_sent(conn, alert.id, now)
+        telegram.send(f"{alert.message}\n{alert.listing.url}")
+        with db.transaction(session):
+            alert.sent_at = now
     return len(pending)

@@ -100,7 +100,11 @@ for example `0 9,21 * * *`, from the project folder.
 
 ## Database
 
-Everything is saved in `price_tracker.db` (SQLite) in the project folder:
+Everything is saved in `price_tracker.db` (SQLite) in the project folder. The
+app uses [SQLAlchemy](https://www.sqlalchemy.org/), so it can also run on
+PostgreSQL: install a driver (`pip install "psycopg[binary]"`) and set the
+`DATABASE_URL` environment variable, e.g.
+`postgresql+psycopg://user:password@host/dbname`.
 
 | Table           | One row per                    | Main fields |
 |-----------------|--------------------------------|-------------|
@@ -109,11 +113,28 @@ Everything is saved in `price_tracker.db` (SQLite) in the project folder:
 | `price_history` | successful check of a listing  | listing_id, price, in_stock, checked_at |
 | `alerts`        | alert made                     | listing_id, kind (`near_target`/`big_drop`), price, message, created_at, sent_at |
 
-Prices are stored as whole paise (₹1,299.50 is `129950`) and times as UTC.
+Prices are stored as whole paise (₹1,299.50 is `129950`) and times in UTC.
 `sent_at` is filled in when the alert is sent to Telegram. Open the file
-with any SQLite viewer, such as DB Browser for SQLite.
+with any SQLite viewer, such as the SQLite Viewer extension for VS Code.
 
-From other Python code:
+The tables are defined in `models.py`. Whenever the app opens the database it
+brings the tables up to date with the [Alembic](https://alembic.sqlalchemy.org/)
+migrations in `price_tracker/migrations/`, so a new database is created and an
+older one upgraded by itself. `alembic_version` is Alembic's own table.
+
+### Changing the tables
+
+1. Change the model in `models.py`.
+2. From the project folder, have Alembic write the migration:
+   ```
+   .venv\Scripts\alembic.exe revision --autogenerate --rev-id 0002 -m "add users"
+   ```
+3. Read the new file in `price_tracker/migrations/versions/` and fix what it got
+   wrong (it can't tell a renamed column from a new one, for example).
+4. Run the tests. `test_migrations_match_the_models` fails if the models and
+   migrations don't agree. The app applies the migration the next time it runs.
+
+### From other Python code
 
 ```python
 from price_tracker import fetch_product
@@ -122,7 +143,8 @@ product = fetch_product("https://www.amazon.in/dp/B088FKCD4J")
 print(product.title, product.price, product.in_stock)
 ```
 
-Tracking from code is in `tracking.py`: `track()`, `check_all()`, `set_target()`, `untrack()`.
+Tracking from code is in `tracking.py`: `track()`, `check_all()`, `set_target()`,
+`untrack()`. They take a session from `db.connect()`.
 
 ## Tests
 
@@ -143,8 +165,9 @@ price_tracker/
     cli.py           the command line (commands, printing, asking for links)
     fetch.py         downloads a page, retries, hands it to the right store
     links.py         finds the link in pasted text and works out the store
-    models.py        ProductInfo, PageDetails, and the saved Item, Listing and PendingAlert
-    db.py            the SQLite tables and the queries on them
+    models.py        ProductInfo, PageDetails, and the tables: Item, Listing, PriceCheck, Alert
+    db.py            opening the database (SQLite or DATABASE_URL) and the queries on it
+    migrations/      Alembic migrations that create and upgrade the tables
     tracking.py      adding products, checking them, making alerts
     alerts.py        the alert rules: near target, big drop
     notify.py        sending alerts to Telegram
@@ -160,6 +183,7 @@ price_tracker/
 tests/
     pages/           sample HTML pages
     test_*.py        one test file per module
+alembic.ini          settings for the `alembic` command, to write new migrations
 ```
 
 **Adding a store:** write `stores/<store>.py` with the same names as `amazon.py`

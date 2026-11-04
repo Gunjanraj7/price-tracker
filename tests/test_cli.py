@@ -130,7 +130,7 @@ def test_the_daily_check_runs_without_a_terminal(run, monkeypatch):
 
 
 def test_a_crash_is_written_to_the_log(run, monkeypatch):
-    def crash(conn, client):
+    def crash(session, client):
         raise RuntimeError("something broke")
 
     monkeypatch.setattr(cli, "check", crash)

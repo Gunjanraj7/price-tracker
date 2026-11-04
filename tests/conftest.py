@@ -32,6 +32,12 @@ def no_waiting(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_real_database(monkeypatch):
+    """Tests never use a database set in DATABASE_URL; each makes its own."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def no_telegram(monkeypatch):
     """Tests never message the real Telegram, even on a computer where it's set up."""
     monkeypatch.delenv(notify.TOKEN_VARIABLE, raising=False)

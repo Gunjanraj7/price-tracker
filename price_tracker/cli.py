@@ -28,16 +28,16 @@ In PowerShell or cmd, put links in quotes: they often contain '&'.
 
 import argparse
 import re
-import sqlite3
 import sys
 import time
 import traceback
-from contextlib import closing, redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from textwrap import shorten
 
 import httpx
+from sqlalchemy.orm import Session
 
 from . import config, db, notify, scheduler, tracking
 from .errors import FetchError, NotifyError, ScheduleError, TrackingError
@@ -180,15 +180,15 @@ def print_alerts(alerts: list[str]) -> None:
         print(f"Alert:    {message}")
 
 
-def add(conn: sqlite3.Connection, client: httpx.Client, args: argparse.Namespace) -> int:
+def add(session: Session, client: httpx.Client, args: argparse.Namespace) -> int:
     try:
-        result = tracking.track(conn, args.link, client, target=args.target, name=args.name, item_id=args.to)
+        result = tracking.track(session, args.link, client, target=args.target, name=args.name, item_id=args.to)
     except (FetchError, TrackingError) as error:
         print(f"Error:    {error}")
         return 1
 
-    item = db.get_item(conn, result.listing.item_id)
-    listing = db.get_listing(conn, result.listing.id)
+    listing = result.listing
+    item = listing.item
     print(f"{'Added to' if args.to else 'Tracking as'} item {item.id}: {short(item.name)}")
     print(f"Store:    {listing.site}")
     print(f"Price:    {price_text(listing)}")
@@ -197,8 +197,8 @@ def add(conn: sqlite3.Connection, client: httpx.Client, args: argparse.Namespace
     return 0
 
 
-def list_items(conn: sqlite3.Connection) -> int:
-    items = db.all_items(conn)
+def list_items(session: Session) -> int:
+    items = db.all_items(session)
     if not items:
         print('Nothing tracked yet. Start with: python -m price_tracker add "<link>"')
         return 0
@@ -209,23 +209,23 @@ def list_items(conn: sqlite3.Connection) -> int:
         paused = "" if item.active else "  (paused)"
         print(f"Item {item.id}: {short(item.name)}{paused}")
         print(f"    target    {target_text(item)}")
-        for listing in db.listings_of(conn, item.id):
+        for listing in item.listings:
             print(f"    {listing.site:<9} {price_text(listing):<14} checked {when(listing.last_checked_at)}")
             if listing.last_error:
                 print(f"              last check failed: {listing.last_error}")
     return 0
 
 
-def check(conn: sqlite3.Connection, client: httpx.Client) -> int:
-    count = len(db.listings_to_check(conn))
+def check(session: Session, client: httpx.Client) -> int:
+    count = len(db.listings_to_check(session))
     if not count:
         print('Nothing to check. Start with: python -m price_tracker add "<link>"')
         return 0
 
-    names = {item.id: short(item.name, 40) for item in db.all_items(conn)}
+    names = {item.id: short(item.name, 40) for item in db.all_items(session)}
     print(f"Checking {count} store page{'s' if count > 1 else ''}...")
     alerts, failed = [], False
-    for result in tracking.check_all(conn, client):
+    for result in tracking.check_all(session, client):
         listing = result.listing
         if result.error:
             state, failed = f"check failed: {result.error}", True
@@ -244,14 +244,14 @@ def check(conn: sqlite3.Connection, client: httpx.Client) -> int:
     return 1 if failed else 0
 
 
-def send_alerts(conn: sqlite3.Connection) -> bool:
+def send_alerts(session: Session) -> bool:
     """Send the alerts not sent yet to Telegram, if it's set up. Returns False if sending failed."""
     telegram = notify.from_environment()
     if telegram is None:
         return True
     with telegram:
         try:
-            sent = notify.send_alerts(conn, telegram)
+            sent = notify.send_alerts(session, telegram)
         except NotifyError as error:
             print(f"Telegram: couldn't send alerts. {error}")
             return False
@@ -370,16 +370,16 @@ def run(args: argparse.Namespace) -> int:
     if args.command == "schedule":
         return schedule_command(args)
 
-    with closing(db.connect()) as conn:
+    with db.connect() as session:
         try:
             if args.command == "list":
-                return list_items(conn)
+                return list_items(session)
             if args.command == "target":
-                tracking.set_target(conn, args.item, args.price)
+                tracking.set_target(session, args.item, args.price)
                 print(f"Item {args.item} target: {format_rupees(args.price) if args.price is not None else 'none'}")
                 return 0
             if args.command == "remove":
-                tracking.untrack(conn, args.item)
+                tracking.untrack(session, args.item)
                 print(f"Stopped tracking item {args.item}.")
                 return 0
         except TrackingError as error:
@@ -387,8 +387,8 @@ def run(args: argparse.Namespace) -> int:
             return 1
 
         with new_client() as client:
-            code = add(conn, client, args) if args.command == "add" else check(conn, client)
-        if not send_alerts(conn):
+            code = add(session, client, args) if args.command == "add" else check(session, client)
+        if not send_alerts(session):
             code = 1
         return code
 

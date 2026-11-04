@@ -2,14 +2,12 @@
 
     from price_tracker import db, new_client, tracking
 
-    conn = db.connect()
-    with new_client() as client:
-        tracking.track(conn, "https://www.amazon.in/dp/B088FKCD4J", client, target=Decimal("1500"))
-        for check in tracking.check_all(conn, client):
+    with db.connect() as session, new_client() as client:
+        tracking.track(session, "https://www.amazon.in/dp/B088FKCD4J", client, target=Decimal("1500"))
+        for check in tracking.check_all(session, client):
             print(check.listing.site, check.product.price if check.product else check.error)
 """
 
-import sqlite3
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -18,12 +16,13 @@ from decimal import Decimal
 from textwrap import shorten
 
 import httpx
+from sqlalchemy.orm import Session
 
 from . import config, db
 from .alerts import find_alerts
 from .errors import FetchError, TrackingError
 from .fetch import fetch_product
-from .models import Listing, ProductInfo
+from .models import Item, Listing, ProductInfo
 from .prices import format_rupees
 
 
@@ -38,7 +37,7 @@ class Check:
 
 
 def track(
-    conn: sqlite3.Connection,
+    session: Session,
     link: str,
     client: httpx.Client,
     target: Decimal | None = None,
@@ -54,79 +53,82 @@ def track(
     item's target price. Raises TrackingError if the item doesn't exist or
     the product is already tracked, and FetchError if the page can't be read.
     """
-    if item_id is not None and db.get_item(conn, item_id) is None:
-        raise TrackingError(f"There is no item {item_id}.")
-
+    item = None if item_id is None else _item(session, item_id)
     product = fetch_product(link, client)
-    existing = db.find_listing(conn, product.site, product.product_id)
+    existing = db.find_listing(session, product.site, product.product_id)
     if existing:
         raise TrackingError(f"This product is already tracked, as item {existing.item_id}.")
 
     now = now or db.utc_now()
-    with conn:
-        if item_id is None:
-            item_id = db.add_item(conn, name or product.title or product.product_id, target, now)
+    with db.transaction(session):
+        if item is None:
+            item = db.add_item(session, name or product.title or product.product_id, target, now)
         elif target is not None:
-            db.set_target(conn, item_id, target)
-        listing = db.get_listing(conn, db.add_listing(conn, item_id, product, now))
-        return _save(conn, listing, product, now)
+            item.target_price = target
+        listing = db.add_listing(session, item, product, now)
+        return _save(session, listing, product, now)
 
 
-def check(conn: sqlite3.Connection, listing: Listing, client: httpx.Client, now: datetime | None = None) -> Check:
+def check(session: Session, listing: Listing, client: httpx.Client, now: datetime | None = None) -> Check:
     """Fetch one listing's price now and save it, with any alerts it deserves."""
     now = now or db.utc_now()
     try:
         product = fetch_product(listing.url, client)
     except FetchError as error:
-        with conn:
-            db.record_error(conn, listing.id, str(error), now)
+        with db.transaction(session):
+            db.record_error(listing, str(error), now)
         return Check(listing, error=str(error))
 
-    with conn:
-        return _save(conn, listing, product, now)
+    with db.transaction(session):
+        return _save(session, listing, product, now)
 
 
-def check_all(conn: sqlite3.Connection, client: httpx.Client, now: datetime | None = None) -> Iterator[Check]:
+def check_all(session: Session, client: httpx.Client, now: datetime | None = None) -> Iterator[Check]:
     """Check every listing of the active items, saving each result as it comes in."""
-    for number, listing in enumerate(db.listings_to_check(conn)):
+    for number, listing in enumerate(db.listings_to_check(session)):
         if number:
             time.sleep(config.PAUSE_BETWEEN_PRODUCTS)
-        yield check(conn, listing, client, now)
+        yield check(session, listing, client, now)
 
 
-def set_target(conn: sqlite3.Connection, item_id: int, target: Decimal | None) -> None:
+def set_target(session: Session, item_id: int, target: Decimal | None) -> None:
     """Change an item's target price; None removes it."""
-    if db.get_item(conn, item_id) is None:
-        raise TrackingError(f"There is no item {item_id}.")
-    with conn:
-        db.set_target(conn, item_id, target)
+    item = _item(session, item_id)
+    with db.transaction(session):
+        item.target_price = target
 
 
-def untrack(conn: sqlite3.Connection, item_id: int) -> None:
+def untrack(session: Session, item_id: int) -> None:
     """Stop tracking an item, and delete its price history and alerts."""
-    if db.get_item(conn, item_id) is None:
+    item = _item(session, item_id)
+    with db.transaction(session):
+        session.delete(item)
+
+
+def _item(session: Session, item_id: int) -> Item:
+    item = db.get_item(session, item_id)
+    if item is None:
         raise TrackingError(f"There is no item {item_id}.")
-    with conn:
-        db.delete_item(conn, item_id)
+    return item
 
 
-def _save(conn: sqlite3.Connection, listing: Listing, product: ProductInfo, now: datetime) -> Check:
-    """Save a fetched price and make the alerts it deserves. Run it inside `with conn:`."""
-    earlier = db.prices_since(conn, listing.id, now - timedelta(days=config.BIG_DROP_DAYS))
-    db.record_price(conn, listing.id, product, now)
+def _save(session: Session, listing: Listing, product: ProductInfo, now: datetime) -> Check:
+    """Save a fetched price and make the alerts it deserves. Run it inside db.transaction()."""
+    earlier = db.prices_since(session, listing, now - timedelta(days=config.BIG_DROP_DAYS))
+    db.record_price(session, listing, product, now)
 
     result = Check(listing, product)
     if not product.in_stock or product.price is None:
         return result
 
-    item = db.get_item(conn, listing.item_id)
+    item = listing.item
     repeat_window = now - timedelta(days=config.ALERT_REPEAT_DAYS)
     for alert in find_alerts(product.price, item.target_price, earlier):
-        sent = db.alert_prices_since(conn, listing.id, alert.kind, repeat_window)
+        sent = db.alert_prices_since(session, listing, alert.kind, repeat_window)
         if any(price <= alert.price for price in sent):
             continue
         name = shorten(item.name, 60, placeholder="…")
         message = f"{name} is {format_rupees(alert.price)} on {listing.site.capitalize()}, {alert.reason}"
-        db.add_alert(conn, listing.id, alert.kind, alert.price, message, now)
+        db.add_alert(session, listing, alert.kind, alert.price, message, now)
         result.alerts.append(message)
     return result

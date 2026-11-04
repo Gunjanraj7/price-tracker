@@ -1,10 +1,10 @@
 import re
-from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
 import pytest
+from sqlalchemy import text
 
 from price_tracker import db, notify
 from price_tracker.errors import NotifyError
@@ -16,59 +16,59 @@ HOUR = timedelta(hours=1)
 
 
 @pytest.fixture
-def conn():
-    with closing(db.connect(":memory:")) as conn:
-        yield conn
+def session():
+    with db.connect("sqlite://") as session:
+        yield session
 
 
-def make_alerts(conn, *moments):
+def make_alerts(session, *moments):
     """Save an alert made at each of `moments`, and return their ids."""
     product = ProductInfo("amazon", "B0D3DK779N", AMAZON, "Earbuds", Decimal("999"), "INR", True)
-    with conn:
-        listing = db.add_listing(conn, db.add_item(conn, "Earbuds", None, START), product, START)
+    with db.transaction(session):
+        listing = db.add_listing(session, db.add_item(session, "Earbuds", None, START), product, START)
         return [
-            db.add_alert(conn, listing, "big_drop", Decimal("999"), f"Earbuds alert {number}", moment)
+            db.add_alert(session, listing, "big_drop", Decimal("999"), f"Earbuds alert {number}", moment).id
             for number, moment in enumerate(moments, 1)
         ]
 
 
-def unsent(conn):
-    return [row[0] for row in conn.execute("SELECT id FROM alerts WHERE sent_at IS NULL ORDER BY id")]
+def unsent(session):
+    return list(session.scalars(text("SELECT id FROM alerts WHERE sent_at IS NULL ORDER BY id")))
 
 
 def test_not_set_up_without_a_token():
     assert notify.from_environment() is None
 
 
-def test_sends_each_alert_once_with_its_link(conn, telegram):
-    make_alerts(conn, START, START + HOUR)
+def test_sends_each_alert_once_with_its_link(session, telegram):
+    make_alerts(session, START, START + HOUR)
     with notify.from_environment() as bot:
-        assert notify.send_alerts(conn, bot, now=START + 2 * HOUR) == 2
-        assert notify.send_alerts(conn, bot, now=START + 3 * HOUR) == 0
+        assert notify.send_alerts(session, bot, now=START + 2 * HOUR) == 2
+        assert notify.send_alerts(session, bot, now=START + 3 * HOUR) == 0
 
     assert telegram.sent == [f"Earbuds alert 1\n{AMAZON}", f"Earbuds alert 2\n{AMAZON}"]
     assert telegram.calls[0][1]["chat_id"] == "42"
-    assert unsent(conn) == []
+    assert unsent(session) == []
 
 
-def test_alerts_older_than_a_day_are_not_sent(conn, telegram):
-    make_alerts(conn, START, START + 25 * HOUR)
+def test_alerts_older_than_a_day_are_not_sent(session, telegram):
+    make_alerts(session, START, START + 25 * HOUR)
     with notify.from_environment() as bot:
-        assert notify.send_alerts(conn, bot, now=START + 26 * HOUR) == 1
+        assert notify.send_alerts(session, bot, now=START + 26 * HOUR) == 1
     assert telegram.sent == [f"Earbuds alert 2\n{AMAZON}"]
 
 
-def test_a_failed_send_stops_and_the_rest_wait_for_next_time(conn, telegram):
-    first, second, third = make_alerts(conn, START, START, START)
+def test_a_failed_send_stops_and_the_rest_wait_for_next_time(session, telegram):
+    first, second, third = make_alerts(session, START, START, START)
     telegram.replies = [None, (502, "<html>Bad Gateway</html>")]
 
     with notify.from_environment() as bot:
         with pytest.raises(NotifyError, match=re.escape("problem of its own (HTTP 502)")):
-            notify.send_alerts(conn, bot, now=START + HOUR)
-        assert unsent(conn) == [second, third]
+            notify.send_alerts(session, bot, now=START + HOUR)
+        assert unsent(session) == [second, third]
 
-        assert notify.send_alerts(conn, bot, now=START + 2 * HOUR) == 2
-    assert unsent(conn) == []
+        assert notify.send_alerts(session, bot, now=START + 2 * HOUR) == 2
+    assert unsent(session) == []
 
 
 @pytest.mark.parametrize(
