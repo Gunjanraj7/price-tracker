@@ -1,7 +1,8 @@
 """The web API, for the React UI and anything else that wants the tracked prices.
 
-Run it with `python -m price_tracker serve` and open http://127.0.0.1:8000/docs
-to try every endpoint in the browser.
+Run it with `python -m price_tracker serve`. It also serves the built web UI
+(web/dist) at http://127.0.0.1:8000, and http://127.0.0.1:8000/docs lets you
+try every endpoint in the browser.
 
 There are no logins yet, so it only listens on this computer unless told
 otherwise. Don't put it on the internet like this.
@@ -14,15 +15,17 @@ import logging
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from pathlib import Path
 from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Query, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import URL
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import db, notify, tracking
+from . import config, db, notify, tracking
 from .errors import AlreadyTracked, Blocked, FetchError, NetworkError, NotFound, NotifyError, ParseError
 from .fetch import new_client
 from .models import Alert, Item
@@ -53,11 +56,14 @@ ERROR_STATUS = {
 }
 
 
-def create_app(database_url: str | URL | None = None, http_client: httpx.Client | None = None) -> FastAPI:
+def create_app(
+    database_url: str | URL | None = None, http_client: httpx.Client | None = None, web_dir: Path | None = None
+) -> FastAPI:
     """The API, on the database at `database_url` (db.database_url() by default).
 
     `http_client` fetches the store pages; by default it's a new one that looks
-    like a browser. Tests give a fake one.
+    like a browser. Tests give a fake one. The web UI is served from `web_dir`
+    (config.WEB_DIR by default) once it's built.
     """
 
     @asynccontextmanager
@@ -81,7 +87,32 @@ def create_app(database_url: str | URL | None = None, http_client: httpx.Client 
     app.include_router(router)
     for error_class, code in ERROR_STATUS.items():
         app.add_exception_handler(error_class, _answer_with(code))
+    _serve_ui(app, config.WEB_DIR if web_dir is None else web_dir)
     return app
+
+
+NOT_BUILT = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Price Tracker</title>
+<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.6}
+code{background:rgba(127,127,127,.15);padding:.1em .35em;border-radius:4px}</style></head>
+<body><h1>Price Tracker</h1>
+<p>The API is running, but the web page isn't built yet. In the project folder, run:</p>
+<pre><code>cd web
+npm install
+npm run build</code></pre>
+<p>Then reload this page. You can already try the API at <a href="/docs">/docs</a>.</p>
+</body></html>"""
+
+
+def _serve_ui(app: FastAPI, web_dir: Path) -> None:
+    """Serve the built UI at /, after the API's routes, or a page that says how to build it."""
+    if (web_dir / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="ui")
+        return
+
+    @app.get("/", include_in_schema=False)
+    def ui_not_built() -> HTMLResponse:
+        return HTMLResponse(NOT_BUILT)
 
 
 def _answer_with(code: int):

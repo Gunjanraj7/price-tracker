@@ -12,9 +12,9 @@ FLIPKART = "https://www.flipkart.com/boat-airdopes-131/p/itma0ea2cce3d648?pid=AC
 
 
 @pytest.fixture
-def api(store):
+def api(store, tmp_path):
     """The API on a new database in memory, with `store` setting the prices."""
-    with TestClient(create_app("sqlite://")) as client:
+    with TestClient(create_app("sqlite://", web_dir=tmp_path)) as client:
         yield client
 
 
@@ -161,6 +161,23 @@ def test_recent_alerts(api, store):
     assert (alert["kind"], alert["price"]) == ("near_target", 990)
     assert alert["sent_at"] is None      # Telegram isn't set up in tests
     assert api.get("/api/alerts?limit=0").status_code == 422
+
+
+def test_serves_the_built_web_ui(tmp_path):
+    (tmp_path / "index.html").write_text("<h1>Price Tracker UI</h1>", encoding="utf-8")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "app.js").write_text("console.log('hi')", encoding="utf-8")
+    with TestClient(create_app("sqlite://", web_dir=tmp_path)) as api:
+        assert "Price Tracker UI" in api.get("/").text
+        assert api.get("/assets/app.js").status_code == 200
+        assert api.get("/api/health").json() == {"status": "ok"}      # the API still comes first
+        assert api.get("/docs").status_code == 200
+
+
+def test_says_how_to_build_the_web_ui(api):
+    page = api.get("/")
+    assert page.status_code == 200
+    assert "npm run build" in page.text
 
 
 def test_the_docs_list_every_endpoint(api):

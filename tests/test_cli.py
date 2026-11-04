@@ -197,7 +197,7 @@ def test_serve_runs_the_api_on_this_computer(run, monkeypatch):
     code, out = run("serve")
     assert code == 0
     assert calls == [(("price_tracker.api:app",), {"host": "127.0.0.1", "port": 8000, "reload": False})]
-    assert out == "Web API:  http://127.0.0.1:8000/docs to try it. Ctrl+C stops it.\n"
+    assert out == "Open:     http://127.0.0.1:8000   (the API docs are at /docs). Ctrl+C stops it.\n"
 
     code, out = run("serve", "--host", "0.0.0.0", "--port", "9000")
     assert calls[-1][1]["host"] == "0.0.0.0"

@@ -17,7 +17,7 @@ Usage, from the project folder:
     python -m price_tracker schedule on [TIME ...]   checks every day at 9:00 and 21:00, or the TIMEs
     python -m price_tracker schedule off             stops the daily checks
     python -m price_tracker schedule                 says whether daily checks are on
-    python -m price_tracker serve [--port 8000]      runs the web API; try it at http://127.0.0.1:8000/docs
+    python -m price_tracker serve [--port 8000]      runs the web app and its API at http://127.0.0.1:8000
 
 Tracked items are saved in price_tracker.db, in the project folder. When
 Telegram is set up, `add` and `check` also send their alerts there.
@@ -155,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"with on: when to check, e.g. 8:30 20:30 (default: {' '.join(config.CHECK_TIMES)})",
     )
 
-    serve = commands.add_parser("serve", help="run the web API; try it at http://127.0.0.1:8000/docs")
+    serve = commands.add_parser("serve", help="run the web app and its API at http://127.0.0.1:8000")
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument(
         "--host", default="127.0.0.1",
@@ -379,7 +379,7 @@ def serve(args: argparse.Namespace) -> int:
 
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print("Warning:  other computers can reach the API, and it has no logins yet.")
-    print(f"Web API:  http://{args.host}:{args.port}/docs to try it. Ctrl+C stops it.")
+    print(f"Open:     http://{args.host}:{args.port}   (the API docs are at /docs). Ctrl+C stops it.")
     uvicorn.run("price_tracker.api:app", host=args.host, port=args.port, reload=args.reload)
     return 0
 

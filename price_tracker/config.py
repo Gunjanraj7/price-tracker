@@ -22,6 +22,9 @@ DEBUG_DIR = PROJECT_DIR / "debug"
 # The database with your tracked products, their price history and alerts.
 DB_PATH = PROJECT_DIR / "price_tracker.db"
 
+# The built web UI (`npm run build` in web/), which `serve` shows at its address.
+WEB_DIR = PROJECT_DIR / "web" / "dist"
+
 # When `schedule on` checks prices, every day, unless you give other times.
 CHECK_TIMES = ("09:00", "21:00")
 

@@ -3,5 +3,7 @@ __pycache__/
 .pytest_cache/
 debug/
 logs/
+web/node_modules/
+web/dist/
 *.db
 *.db-journal

@@ -1,16 +1,46 @@
 # Price Tracker
 
 Gets the current price of Amazon.in and Flipkart products from their links,
-and tracks prices over time to alert you about drops.
+and tracks prices over time to alert you about drops: in a web app, on the
+command line, and on Telegram.
 
 ## Setup
+
+You need Python 3.12 or newer, and Node.js 20 or newer for the web app.
 
 ```
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
+cd web
+npm install
+npm run build
+cd ..
 ```
 
-## Run
+## Web app
+
+```
+.venv\Scripts\python.exe -m price_tracker serve
+```
+
+Then open **http://127.0.0.1:8000**. Paste a product link to start tracking it,
+set the price you'd like to pay, check prices now, see each item's price
+history as a chart or a table, and read your recent alerts. It follows your
+system's light or dark theme and works on a phone-sized screen.
+
+The page is built from `web/` (React, TypeScript and Vite) into `web/dist`, which
+`serve` hosts next to the API. Run `npm run build` again after changing it.
+While working on the UI, run the API and the Vite dev server side by side;
+Vite passes `/api` on to the API and reloads the page as you edit:
+
+```
+.venv\Scripts\python.exe -m price_tracker serve --reload    # terminal 1
+cd web; npm run dev                                          # terminal 2, then open http://localhost:5173
+```
+
+`npm test` in `web/` runs the UI's tests.
+
+## Command line
 
 From the project folder:
 
@@ -101,13 +131,8 @@ for example `0 9,21 * * *`, from the project folder.
 ## Web API
 
 A [FastAPI](https://fastapi.tiangolo.com/) web API does what the command line
-does, for the web UI or anything else:
-
-```
-.venv\Scripts\python.exe -m price_tracker serve      # then open http://127.0.0.1:8000/docs
-```
-
-`/docs` lists every endpoint and lets you try them in the browser.
+does, for the web app or anything else. `serve` runs it; open
+http://127.0.0.1:8000/docs to see every endpoint and try them in the browser.
 
 | Endpoint | Does |
 |----------|------|
@@ -188,7 +213,7 @@ Tracking from code is in `tracking.py`: `track()`, `check_all()`, `set_target()`
 
 The tests are offline and use the sample pages in `tests/pages/`, a fake
 Telegram server and a fake Task Scheduler. They never message your real bot
-or change your scheduled tasks.
+or change your scheduled tasks. The web app's tests are in `web/`: `npm test`.
 
 ## Layout
 
@@ -219,6 +244,11 @@ price_tracker/
 tests/
     pages/           sample HTML pages
     test_*.py        one test file per module
+web/                 the web app (React + TypeScript, built with Vite)
+    src/App.tsx      the page: add form, items, alerts
+    src/components/  ItemCard, PriceHistory (the chart), AddItemForm, AlertsPanel, Toast
+    src/api.ts       talks to the API
+    src/format.ts    rupees (₹1,29,999), "2 hours ago", parsing typed prices
 alembic.ini          settings for the `alembic` command, to write new migrations
 ```
 
