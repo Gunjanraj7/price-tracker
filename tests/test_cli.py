@@ -55,3 +55,61 @@ def test_links_without_a_command_are_not_saved(run, tmp_path):
     assert code == 0
     assert "Price:    ₹470.50" in out
     assert not (tmp_path / "test.db").exists()
+
+
+def test_alerts_are_sent_to_telegram_once(run, telegram):
+    code, out = run("add", AMAZON, "--target", "₹480")
+    assert code == 0
+    assert out.endswith("Telegram: sent 1 alert.\n")
+    [message] = telegram.sent
+    assert message.endswith(f"is ₹470.50 on Amazon, at or below your ₹480 target\n{AMAZON}")
+
+    code, out = run("check")
+    assert code == 0
+    assert "Telegram" not in out
+    assert len(telegram.sent) == 1
+
+
+def test_a_telegram_failure_is_reported_and_tried_again(run, telegram):
+    telegram.replies = [(401, {"ok": False, "error_code": 401, "description": "Unauthorized"})]
+    code, out = run("add", AMAZON, "--target", "₹480")
+    assert code == 1
+    assert "Tracking as item 1:" in out
+    assert "Telegram: couldn't send alerts. Telegram doesn't accept the bot token." in out
+
+    code, out = run("check")
+    assert "Telegram: sent 1 alert." in out
+    assert len(telegram.sent) == 1
+
+
+def test_telegram_setup_without_a_token(run, tmp_path):
+    code, out = run("telegram")
+    assert code == 1
+    assert out.startswith("TELEGRAM_BOT_TOKEN isn't set.")
+    assert not (tmp_path / "test.db").exists()
+
+
+def test_telegram_setup_finds_the_chat_id(run, telegram, monkeypatch):
+    monkeypatch.delenv("TELEGRAM_CHAT_ID")
+    code, out = run("telegram")
+    assert (code, out.splitlines()[0]) == (1, "The token works, but no one has messaged the bot in the last 24 hours.")
+
+    telegram.updates = [{"update_id": 1, "message": {"chat": {"id": 42, "first_name": "Asha"}, "text": "hi"}}]
+    code, out = run("telegram")
+    assert code == 0
+    assert "    42    Asha\n" in out
+    assert telegram.sent == []
+
+
+def test_telegram_setup_sends_a_test_message(run, telegram):
+    code, out = run("telegram")
+    assert (code, out) == (0, "Sent a test message to chat 42. Check Telegram.\n")
+    assert telegram.sent == ["Price Tracker is connected. Price drop alerts will arrive here."]
+
+
+def test_telegram_setup_reports_a_wrong_token(run, telegram, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "999:wrong")
+    code, out = run("telegram")
+    assert code == 1
+    assert "doesn't accept the bot token" in out
+    assert "999:wrong" not in out

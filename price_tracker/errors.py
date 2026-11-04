@@ -8,6 +8,10 @@ class TrackingError(Exception):
     """A tracking request that can't be done, like adding a product twice."""
 
 
+class NotifyError(Exception):
+    """An alert could not be sent, or Telegram isn't set up right."""
+
+
 class FetchError(Exception):
     """Base class for everything that can go wrong while fetching a price."""
 

@@ -55,3 +55,13 @@ class Listing:
     last_in_stock: bool
     last_checked_at: datetime
     last_error: str | None          # why the last check failed; None when it worked
+
+
+@dataclass
+class PendingAlert:
+    """An alert that hasn't been sent yet, with the link to the product."""
+
+    id: int
+    message: str
+    url: str
+    created_at: datetime

@@ -11,8 +11,11 @@ Usage, from the project folder:
     python -m price_tracker check                    checks every tracked item now and shows alerts
     python -m price_tracker target ITEM PRICE        changes an item's target price ("off" removes it)
     python -m price_tracker remove ITEM              stops tracking an item and deletes its history
+    python -m price_tracker telegram                 sets up Telegram alerts: finds your chat ID,
+                                                     then sends a test message
 
-Tracked items are saved in price_tracker.db, in the project folder.
+Tracked items are saved in price_tracker.db, in the project folder. When
+Telegram is set up, `add` and `check` also send their alerts there.
 
 A link can be a normal product link, a short share link (amzn.in/d/...,
 dl.flipkart.com/s/...) or the whole message the store app shares.
@@ -31,13 +34,13 @@ from textwrap import shorten
 
 import httpx
 
-from . import config, db, tracking
-from .errors import FetchError, TrackingError
+from . import config, db, notify, tracking
+from .errors import FetchError, NotifyError, TrackingError
 from .fetch import fetch_product, new_client
 from .models import Item, Listing
 from .prices import format_rupees, parse_price
 
-COMMANDS = ("add", "list", "check", "target", "remove", "-h", "--help")
+COMMANDS = ("add", "list", "check", "target", "remove", "telegram", "-h", "--help")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -121,6 +124,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     remove = commands.add_parser("remove", help="stop tracking an item and delete its history")
     remove.add_argument("item", type=int)
+
+    commands.add_parser("telegram", help="set up Telegram alerts: find your chat ID, then send a test message")
     return parser
 
 
@@ -212,7 +217,59 @@ def check(conn: sqlite3.Connection, client: httpx.Client) -> int:
     return 1 if failed else 0
 
 
+def send_alerts(conn: sqlite3.Connection) -> bool:
+    """Send the alerts not sent yet to Telegram, if it's set up. Returns False if sending failed."""
+    telegram = notify.from_environment()
+    if telegram is None:
+        return True
+    with telegram:
+        try:
+            sent = notify.send_alerts(conn, telegram)
+        except NotifyError as error:
+            print(f"Telegram: couldn't send alerts. {error}")
+            return False
+    if sent:
+        print(f"Telegram: sent {sent} alert{'s' if sent > 1 else ''}.")
+    return True
+
+
+def telegram_setup() -> int:
+    """Check the Telegram settings step by step: the token, then the chat ID, then a test message."""
+    telegram = notify.from_environment()
+    if telegram is None:
+        print(f"{notify.TOKEN_VARIABLE} isn't set. To get alerts on Telegram:")
+        print("  1. In Telegram, message @BotFather and send /newbot. It gives you a token.")
+        print(f"  2. Save the token in an environment variable called {notify.TOKEN_VARIABLE}, and open a new terminal.")
+        print("  3. Send your bot any message, then run this again.")
+        return 1
+
+    with telegram:
+        try:
+            if telegram.chat_id:
+                telegram.send("Price Tracker is connected. Price drop alerts will arrive here.")
+                print(f"Sent a test message to chat {telegram.chat_id}. Check Telegram.")
+                return 0
+            chats = telegram.chats()
+        except NotifyError as error:
+            print(f"Error:    {error}")
+            return 1
+
+    if not chats:
+        print("The token works, but no one has messaged the bot in the last 24 hours.")
+        print("Open your bot in Telegram, send it any message, then run this again.")
+        return 1
+    print("The token works. These chats messaged your bot:")
+    for chat in chats:
+        print(f"    {chat.id}    {chat.name}")
+    print(f"Save your chat's number in an environment variable called {notify.CHAT_VARIABLE},")
+    print("open a new terminal, and run this again to send a test message.")
+    return 0
+
+
 def run(args: argparse.Namespace) -> int:
+    if args.command == "telegram":
+        return telegram_setup()
+
     with closing(db.connect()) as conn:
         try:
             if args.command == "list":
@@ -230,9 +287,10 @@ def run(args: argparse.Namespace) -> int:
             return 1
 
         with new_client() as client:
-            if args.command == "add":
-                return add(conn, client, args)
-            return check(conn, client)
+            code = add(conn, client, args) if args.command == "add" else check(conn, client)
+        if not send_alerts(conn):
+            code = 1
+        return code
 
 
 def main(argv: list[str] | None = None) -> int:

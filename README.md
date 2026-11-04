@@ -47,6 +47,30 @@ The same alert isn't repeated for 7 days unless the price falls further. All
 these numbers are in `config.py`. `check` is meant to run twice a day; nothing
 runs it automatically yet.
 
+## Telegram alerts
+
+When Telegram is set up, `add` and `check` also send each new alert to your
+Telegram, with the product link. Without it, alerts only show in the terminal.
+
+1. In Telegram, message **@BotFather**, send `/newbot` and follow the steps.
+   It gives you a token for your bot.
+2. Save the token in an environment variable called `TELEGRAM_BOT_TOKEN`.
+   On Windows: search the Start menu for *Edit environment variables for your
+   account*, click **New...**, enter the name and paste the token.
+3. Open your bot in Telegram and send it any message.
+4. Open a new terminal (restart VS Code if you use its terminal, so it sees
+   the new variable) and run:
+   ```
+   .venv\Scripts\python.exe -m price_tracker telegram
+   ```
+   It lists the chats that messaged your bot. Save your chat's number in an
+   environment variable called `TELEGRAM_CHAT_ID`, the same way.
+5. Open a new terminal again and run the same command. It sends a test message.
+
+The token lets anyone control your bot: keep it in the environment variable,
+never in the code or in Git. If an alert can't be sent, `check` says why and
+tries it again next time, for up to 24 hours.
+
 ## Database
 
 Everything is saved in `price_tracker.db` (SQLite) in the project folder:
@@ -59,7 +83,7 @@ Everything is saved in `price_tracker.db` (SQLite) in the project folder:
 | `alerts`        | alert made                     | listing_id, kind (`near_target`/`big_drop`), price, message, created_at, sent_at |
 
 Prices are stored as whole paise (₹1,299.50 is `129950`) and times as UTC.
-`sent_at` stays empty until notifications are sent somewhere. Open the file
+`sent_at` is filled in when the alert is sent to Telegram. Open the file
 with any SQLite viewer, such as DB Browser for SQLite.
 
 From other Python code:
@@ -79,7 +103,8 @@ Tracking from code is in `tracking.py`: `track()`, `check_all()`, `set_target()`
 .venv\Scripts\python.exe -m pytest
 ```
 
-The tests are offline and use the sample pages in `tests/pages/`.
+The tests are offline and use the sample pages in `tests/pages/` and a fake
+Telegram server. They never message your real bot, even when it's set up.
 
 ## Layout
 
@@ -90,13 +115,14 @@ price_tracker/
     cli.py           the command line (commands, printing, asking for links)
     fetch.py         downloads a page, retries, hands it to the right store
     links.py         finds the link in pasted text and works out the store
-    models.py        ProductInfo, PageDetails, and the saved Item and Listing
+    models.py        ProductInfo, PageDetails, and the saved Item, Listing and PendingAlert
     db.py            the SQLite tables and the queries on them
     tracking.py      adding products, checking them, making alerts
     alerts.py        the alert rules: near target, big drop
-    errors.py        FetchError and its subclasses, TrackingError
+    notify.py        sending alerts to Telegram
+    errors.py        FetchError and its subclasses, TrackingError, NotifyError
     prices.py        reading "₹1,299.00" and writing ₹1,29,999
-    config.py        timeouts, retries, pauses, debug folder
+    config.py        timeouts, retries, pauses, alert limits, debug folder
     stores/
         __init__.py  the list of stores
         common.py    helpers every store uses (CAPTCHA check, schema.org data)

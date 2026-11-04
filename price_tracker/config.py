@@ -30,3 +30,11 @@ BIG_DROP_DAYS = 30
 
 # Don't repeat an alert for this many days, unless the price falls further.
 ALERT_REPEAT_DAYS = 7
+
+# Alerts are sent to Telegram when it's set up (see README). An alert that
+# couldn't be sent is tried again on later checks until it's this many hours
+# old; after that the price has probably changed, so it's dropped.
+SEND_ALERTS_WITHIN_HOURS = 24
+
+# Wait between Telegram messages: it allows about one a second per chat.
+PAUSE_BETWEEN_MESSAGES = 1.0

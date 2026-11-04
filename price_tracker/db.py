@@ -18,7 +18,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from . import config
-from .models import Item, Listing, ProductInfo
+from .models import Item, Listing, PendingAlert, ProductInfo
 
 # Raise this and add the changes to connect() when the tables change,
 # so existing databases are updated instead of rebuilt.
@@ -245,3 +245,18 @@ def alert_prices_since(conn: sqlite3.Connection, listing_id: int, kind: str, sin
         (listing_id, kind, _stamp(since)),
     )
     return [_rupees(row["price"]) for row in rows]
+
+
+def unsent_alerts(conn: sqlite3.Connection, since: datetime) -> list[PendingAlert]:
+    """The alerts made from `since` on that haven't been sent yet, oldest first."""
+    rows = conn.execute(
+        "SELECT alerts.id, alerts.message, alerts.created_at, listings.url"
+        " FROM alerts JOIN listings ON listings.id = alerts.listing_id"
+        " WHERE alerts.sent_at IS NULL AND alerts.created_at >= ? ORDER BY alerts.id",
+        (_stamp(since),),
+    )
+    return [PendingAlert(row["id"], row["message"], row["url"], _moment(row["created_at"])) for row in rows]
+
+
+def mark_sent(conn: sqlite3.Connection, alert_id: int, now: datetime) -> None:
+    conn.execute("UPDATE alerts SET sent_at = ? WHERE id = ?", (_stamp(now), alert_id))
