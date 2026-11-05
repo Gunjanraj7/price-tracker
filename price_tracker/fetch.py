@@ -1,5 +1,7 @@
 """Downloading product pages and reading their prices."""
 
+import math
+import threading
 import time
 from contextlib import nullcontext
 
@@ -21,6 +23,13 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-IN,en;q=0.9",
 }
+
+
+# Store requests go one at a time, at least config.PAUSE_BETWEEN_PRODUCTS
+# seconds apart, even when the web app checks several things at once, so
+# the stores see a person browsing rather than a burst of requests.
+_one_at_a_time = threading.Lock()
+_last_request = -math.inf       # time.monotonic() when the last store request ended
 
 
 def new_client(timeout: float = config.REQUEST_TIMEOUT) -> httpx.Client:
@@ -51,9 +60,22 @@ def fetch_product(link: str, client: httpx.Client | None = None, retries: int = 
                 time.sleep(config.RETRY_DELAY * 2**attempt)
 
 
+def _get_politely(url: str, client: httpx.Client) -> httpx.Response:
+    """GET a store page when it's our turn: after any other store request, and the pause after it."""
+    global _last_request
+    with _one_at_a_time:
+        wait = _last_request + config.PAUSE_BETWEEN_PRODUCTS - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            return client.get(url)
+        finally:
+            _last_request = time.monotonic()
+
+
 def _fetch_once(url: str, client: httpx.Client) -> ProductInfo:
     try:
-        response = client.get(url)
+        response = _get_politely(url, client)
     except httpx.HTTPError as error:
         raise NetworkError(f"Could not reach the store: {error}") from error
 
@@ -91,4 +113,5 @@ def _fetch_once(url: str, client: httpx.Client) -> ProductInfo:
         price=details.price,
         currency=details.currency,
         in_stock=details.in_stock,
+        image_url=details.image_url,
     )

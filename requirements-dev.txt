@@ -1,0 +1,10 @@
+# Price Tracker: everything for working on the code. The app's own packages,
+# plus the test runner.
+#
+#     .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+#     .venv\Scripts\python.exe -m pytest                # the tests, on SQLite
+#     .venv\Scripts\python.exe -m pytest --postgres     # the same tests, on PostgreSQL
+
+-r requirements.txt
+
+pytest>=8.3,<10                 # runs the tests in tests/

@@ -1,0 +1,354 @@
+/* The basics: page defaults, buttons, inputs, badges, the spinner. */
+
+/* ------------------------------------------------------------ basics */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--link);
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.8125rem;
+}
+
+.good-text {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.bad-text {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.push-right {
+  margin-left: auto;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.85em;
+  background: var(--sunk);
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+}
+
+.command {
+  display: block;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  word-break: break-word;
+  user-select: all;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 30;
+  background: var(--yellow);
+  color: #0f1111;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+/* ------------------------------------------------------------ buttons and inputs */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(15, 17, 17, 0.08);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.12s, transform 0.12s;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-small {
+  min-height: 30px;
+  padding: 4px 11px;
+  font-size: 0.8125rem;
+}
+
+.btn-block {
+  width: 100%;
+  min-height: 44px;
+  font-size: 0.95rem;
+}
+
+.btn-yellow,
+.btn-store.site-amazon {
+  background: var(--yellow);
+  border-color: var(--yellow-border);
+  color: #0f1111;
+}
+
+.btn-yellow:hover:not(:disabled),
+.btn-store.site-amazon:hover {
+  background: var(--yellow-hover);
+  color: #0f1111;
+}
+
+.btn-store.site-flipkart {
+  background: var(--fk-blue);
+  border-color: var(--fk-blue);
+  color: #ffffff;
+}
+
+.btn-store.site-flipkart:hover {
+  background: var(--fk-blue-hover);
+  color: #ffffff;
+}
+
+.btn-danger {
+  background: #d13212;
+  border-color: #d13212;
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b5290d;
+  color: #ffffff;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ghost.danger {
+  color: var(--bad);
+}
+
+.icon-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--sunk);
+}
+
+.chip {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--amazon-orange);
+}
+
+label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="search"],
+select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+
+input::placeholder {
+  color: var(--muted);
+}
+
+/* Amazon's orange glow on the field you're typing in. */
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="search"]:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: #e77600;
+  box-shadow: 0 0 0 3px rgba(228, 121, 17, 0.28);
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+input:disabled {
+  opacity: 0.7;
+}
+
+.rupee-input {
+  position: relative;
+}
+
+.rupee-input > span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.rupee-input input {
+  padding-left: 28px;
+}
+
+.inline-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-row .rupee-input {
+  width: 160px;
+}
+
+.inline-row .grow {
+  flex: 1 1 240px;
+  width: auto;
+}
+
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.message svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.message.error {
+  color: var(--bad);
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sunk);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.badge.good {
+  background: var(--good-wash);
+  color: var(--good);
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

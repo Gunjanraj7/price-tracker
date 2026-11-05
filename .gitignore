@@ -7,3 +7,7 @@ web/node_modules/
 web/dist/
 *.db
 *.db-journal
+# Passwords and other local settings: never commit these.
+.env
+.env.*
+!.env.example

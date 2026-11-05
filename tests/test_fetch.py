@@ -1,8 +1,9 @@
+import math
 from decimal import Decimal
 
 import pytest
 
-from price_tracker import config
+from price_tracker import config, fetch
 from price_tracker.errors import Blocked, FetchError, NetworkError, ParseError, UnsupportedSite
 from price_tracker.fetch import fetch_product
 
@@ -61,6 +62,27 @@ def test_rejects_other_stores_without_going_online(fake_store):
     with pytest.raises(UnsupportedSite):
         fetch_product("https://www.myntra.com/some-shirt/123", client)
     assert requests == []
+
+
+def test_hands_on_the_product_photo(page, fake_store):
+    client, _ = fake_store({AMAZON_LINK: (200, page("amazon_product.html"))})
+    assert fetch_product(AMAZON_LINK, client).image_url.startswith("https://m.media-amazon.com/images/I/")
+
+
+def test_store_requests_wait_their_turn(page, fake_store, monkeypatch):
+    """Even several checks at once reach the stores one by one, PAUSE_BETWEEN_PRODUCTS apart."""
+    monkeypatch.setattr(config, "PAUSE_BETWEEN_PRODUCTS", 3.0)
+    monkeypatch.setattr(fetch, "_last_request", -math.inf)
+    waits = []
+    monkeypatch.setattr(fetch.time, "sleep", waits.append)
+    client, requests = fake_store({AMAZON_LINK: (200, page("amazon_buy_box.html"))})
+
+    fetch_product(AMAZON_LINK, client)
+    assert waits == []                  # the first request goes straight away
+    fetch_product(AMAZON_LINK, client)
+    assert len(requests) == 2
+    [wait] = waits
+    assert 2.5 < wait <= 3.0
 
 
 def test_saves_page_it_could_not_read(tmp_path, monkeypatch, fake_store):

@@ -1,0 +1,163 @@
+/* Smaller screens, and less motion for those who ask for it. Last, so it wins. */
+
+/* ------------------------------------------------------------ smaller screens */
+
+@media (max-width: 1100px) {
+  .dash-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side-column {
+    position: static;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .header-main {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 10px 14px;
+  }
+
+  .add-bar-wrap {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .stat-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .subnav {
+    padding: 0 6px;
+  }
+
+  .schedule-status {
+    display: none;
+  }
+
+  .login-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .login-hero {
+    padding: 36px 24px;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard {
+    padding: 16px 12px 32px;
+  }
+
+  .stat-tile {
+    padding: 12px;
+    column-gap: 10px;
+  }
+
+  .stat-emoji {
+    width: 38px;
+    height: 38px;
+    font-size: 1.2rem;
+  }
+
+  .stat-value {
+    font-size: 1.3rem;
+  }
+
+  .add-bar-target {
+    width: 92px;
+  }
+
+  .add-bar-button {
+    padding: 0 12px;
+  }
+
+  .add-bar-icon {
+    display: none;
+  }
+
+  .account-hello {
+    display: none;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .items-tools {
+    width: 100%;
+  }
+
+  .item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+  }
+
+  .item-card-body {
+    padding: 10px;
+  }
+
+  .price-md {
+    font-size: 1.4rem;
+  }
+
+  /* Two cards a row, like a store's phone app: the photo and the name open the
+     details, so the Buy button gets the whole width. */
+  .item-card-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .foot-actions .btn:not(.btn-store):not(:only-child) {
+    display: none;
+  }
+
+  .foot-actions .btn {
+    flex: 1;
+    padding-inline: 8px;
+  }
+
+  .login-hero {
+    gap: 12px;
+    padding: 28px 20px;
+  }
+
+  .perks {
+    display: none;
+  }
+
+  .drawer-head {
+    grid-template-columns: 1fr auto;
+  }
+
+  .drawer-head .product-image.large {
+    display: none;
+  }
+
+  .stat-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+
+  .fact:nth-child(3) {
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .spinner {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

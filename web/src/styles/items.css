@@ -1,0 +1,439 @@
+/* Item cards: photo, price, verdict badge, target bar, sparkline; empty and loading states. */
+
+.item-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: 16px;
+}
+
+.item-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.item-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+
+.item-card.vibe-target {
+  border-color: var(--good);
+  box-shadow: 0 0 0 1px var(--good), var(--shadow);
+}
+
+.item-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.vibe.on-image {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+.item-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px 14px;
+}
+
+.store-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.store-chip {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.store-chip.site-amazon {
+  background: var(--navy);
+  color: var(--amazon-orange);
+  box-shadow: inset 0 0 0 1px var(--chip-ring);
+}
+
+.store-chip.site-flipkart {
+  background: var(--fk-blue);
+  color: var(--fk-yellow);
+  font-style: italic;
+}
+
+.chip-muted {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--sunk);
+  color: var(--muted);
+}
+
+.item-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.item-name-button {
+  all: unset;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-name-button:hover {
+  color: var(--link-hover);
+}
+
+.item-name-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Amazon's price: a small ₹, big rupees, small raised paise. */
+.price {
+  display: inline-flex;
+  align-items: flex-start;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-symbol,
+.price-fraction {
+  font-size: 0.52em;
+  margin-top: 0.18em;
+}
+
+.price-symbol {
+  margin-right: 1px;
+}
+
+.price-sm {
+  font-size: 1.2rem;
+}
+
+.price-md {
+  font-size: 1.75rem;
+}
+
+.price-lg {
+  font-size: 2.3rem;
+}
+
+.out-of-stock {
+  font-weight: 700;
+  color: var(--bad);
+}
+
+.movement {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.8125rem;
+}
+
+.target-line {
+  font-size: 0.8125rem;
+}
+
+.target-text {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.almost {
+  color: var(--good);
+}
+
+.target-line.target-hit {
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: var(--good-wash);
+  color: var(--good);
+  font-weight: 700;
+}
+
+.target-bar {
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+
+.target-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--amazon-orange), var(--fk-blue));
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 30px;
+  color: var(--muted);
+}
+
+.sparkline-empty {
+  height: 30px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.sparkline.trend-down {
+  color: var(--good);
+}
+
+.sparkline.trend-up {
+  color: var(--bad);
+}
+
+.sparkline-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.sparkline-area {
+  fill: currentColor;
+  opacity: 0.09;
+}
+
+.card-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--warn-wash);
+  color: var(--text-2);
+  font-size: 0.75rem;
+}
+
+.item-card-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.checked {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.foot-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* The verdict badge: red like a store's deal badge, green for a hit target. */
+.vibe {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--sunk);
+  color: var(--text-2);
+}
+
+.vibe.tone-win {
+  background: #067d45;
+  color: #ffffff;
+}
+
+.vibe.tone-great {
+  background: var(--deal-red);
+  color: #ffffff;
+}
+
+.vibe.tone-good {
+  background: var(--good-wash);
+  color: var(--good);
+}
+
+.vibe.tone-bad {
+  background: var(--bad-wash);
+  color: var(--bad);
+}
+
+.vibe.tone-info {
+  background: var(--info-wash);
+  color: var(--info);
+}
+
+.on-image.tone-good,
+.on-image.tone-bad,
+.on-image.tone-info,
+.on-image.tone-neutral {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.on-image.tone-neutral {
+  background: #f1f3f6;
+  color: #3d4451;
+}
+
+/* Product photos sit on white, as in the stores, in both themes. */
+.product-image {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.product-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.product-image.card {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+}
+
+.product-image.thumb {
+  width: 100%;
+  height: 110px;
+  padding: 8px;
+  border-radius: 9px;
+}
+
+.product-image.large {
+  width: 120px;
+  height: 120px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.product-image.placeholder {
+  background: var(--placeholder);
+  font-size: 2.6rem;
+}
+
+.product-image.placeholder.thumb {
+  font-size: 2rem;
+}
+
+.empty-state {
+  padding: 32px;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.empty-emoji {
+  font-size: 2.8rem;
+}
+
+.empty-state h3 {
+  font-size: 1.2rem;
+  margin: 6px 0 2px;
+}
+
+.empty-state ol {
+  max-width: 520px;
+  margin: 16px auto 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  color: var(--text-2);
+}
+
+.empty-filter {
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.skeleton {
+  pointer-events: none;
+}
+
+.skeleton-media,
+.skeleton-line {
+  background: linear-gradient(90deg, var(--sunk) 25%, var(--surface-2) 50%, var(--sunk) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.skeleton-media {
+  aspect-ratio: 4 / 3;
+}
+
+.skeleton-line {
+  height: 12px;
+  width: 60%;
+  border-radius: 6px;
+}
+
+.skeleton-line.wide {
+  width: 90%;
+}
+
+.skeleton-line.short {
+  width: 35%;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}

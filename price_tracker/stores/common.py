@@ -1,6 +1,7 @@
 """Page-reading helpers shared by the store parsers."""
 
 import json
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
 
@@ -19,6 +20,13 @@ BLOCK_MARKERS = (
 def check_not_blocked(html: str) -> None:
     if any(marker in html for marker in BLOCK_MARKERS):
         raise Blocked("The store showed a CAPTCHA or browser check instead of the product.")
+
+
+def image_link(value: str | None) -> str | None:
+    """`value` if it's an https link, else None. The web app only shows images from those."""
+    value = (value or "").strip()
+    parts = urlparse(value)
+    return value if parts.scheme == "https" and parts.netloc else None
 
 
 def select_text(soup: Tag, selector: str) -> str | None:

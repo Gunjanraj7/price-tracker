@@ -3,12 +3,14 @@ from decimal import Decimal
 
 import pytest
 from alembic.autogenerate import compare_metadata
+from alembic.config import Config as AlembicConfig
 from alembic.migration import MigrationContext
-from sqlalchemy import URL, text
+from alembic.script import ScriptDirectory
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, StatementError
 
 from price_tracker import config, db
-from price_tracker.models import Base, ProductInfo
+from price_tracker.models import Base, Item, ProductInfo
 
 NOW = datetime(2026, 11, 4, 3, 30, tzinfo=timezone.utc)
 
@@ -25,23 +27,43 @@ def product(price="1299.50"):
     )
 
 
-@pytest.fixture
-def session():
-    with db.connect("sqlite://") as session:
-        yield session
-
-
 def count(session, table):
     return session.scalar(text(f"SELECT COUNT(*) FROM {table}"))
 
 
-def test_creates_the_tables_once_and_keeps_the_data(tmp_path):
-    url = URL.create("sqlite", database=str(tmp_path / "test.db"))
-    with db.connect(url) as session, db.transaction(session):
+def newest_migration():
+    alembic_config = AlembicConfig()
+    alembic_config.set_main_option("script_location", str(db.MIGRATIONS_DIR))
+    return ScriptDirectory.from_config(alembic_config).get_current_head()
+
+
+def test_creates_the_tables_once_and_keeps_the_data(database_url):
+    with db.connect(database_url) as session, db.transaction(session):
         db.add_item(session, "Earbuds", None, NOW)
-    with db.connect(url) as session:     # the migrations run again and change nothing
+    with db.connect(database_url) as session:     # the migrations run again and change nothing
         assert [item.name for item in db.all_items(session)] == ["Earbuds"]
-        assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == newest_migration() == "0003"
+
+
+def test_upgrades_a_database_made_before_logins(database_url):
+    """A database from before logins and photos gets their tables and column, and keeps its data."""
+    engine = db.make_engine(database_url, upgrade=False)
+    db.migrate(engine, "0001")
+    with engine.begin() as connection:     # the items table hasn't changed since 0001
+        connection.execute(Item.__table__.insert().values(name="Earbuds", active=True, created_at=NOW))
+    engine.dispose()
+
+    with db.connect(database_url) as session:
+        assert [item.name for item in db.all_items(session)] == ["Earbuds"]
+        assert count(session, "users") == count(session, "login_sessions") == 0
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == newest_migration()
+
+
+def test_describes_the_database_without_its_password():
+    assert db.describe("sqlite:///C:/data/price_tracker.db") == "SQLite, C:/data/price_tracker.db"
+    assert db.describe("postgresql+psycopg://me:secret@localhost:5432/prices") == (
+        "PostgreSQL, postgresql+psycopg://me:***@localhost:5432/prices"
+    )
 
 
 def test_uses_the_sqlite_file_unless_database_url_is_set(tmp_path, monkeypatch):
@@ -80,7 +102,11 @@ def test_times_are_saved_in_utc(session):
     session.commit()
     session.expire_all()
 
-    assert session.scalar(text("SELECT created_at FROM items")).startswith("2026-11-04 03:30:00")
+    saved = session.scalar(text("SELECT created_at FROM items"))
+    if session.bind.dialect.name == "sqlite":
+        assert saved.startswith("2026-11-04 03:30:00")     # SQLite keeps no zone: it's UTC
+    else:
+        assert saved == NOW                                 # PostgreSQL keeps the zone
     assert item.created_at == NOW
     assert item.created_at.tzinfo == timezone.utc
 

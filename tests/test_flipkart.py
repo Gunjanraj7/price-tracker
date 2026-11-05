@@ -13,6 +13,18 @@ def test_reads_json_ld(page):
     assert result.in_stock is True
 
 
+def test_reads_the_product_photo_not_the_offer_banners(page):
+    assert parse_page(page("flipkart_product.html")).image_url == (
+        "https://rukminim2.flixcart.com/image/300/300/xif0q/headphone/a/n/7/-original-imahgnf4h8hnyg9s.jpeg"
+    )
+    assert parse_page(page("flipkart_page_data_only.html")).image_url is None
+
+
+def test_only_https_photos_are_kept(page):
+    html = page("flipkart_product.html").replace('content="https://rukminim2', 'content="javascript:alert(1)//rukminim2')
+    assert parse_page(html).image_url is None
+
+
 def test_ignores_out_of_stock_labels_of_other_variants(page):
     # "Out of stock" / "Sold Out" on the page belong to other colours, not this one.
     assert parse_page(page("flipkart_product.html")).in_stock is True

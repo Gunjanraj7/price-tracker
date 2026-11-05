@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup, Tag
 from ..errors import ParseError, UnsupportedSite
 from ..models import PageDetails
 from ..prices import parse_price
-from .common import check_not_blocked, from_json_ld, select_text
+from .common import check_not_blocked, from_json_ld, image_link, select_text
 
 NAME = "amazon"
 DOMAIN = "amazon.in"
@@ -87,6 +87,17 @@ def find_price(soup: BeautifulSoup) -> Decimal | None:
     return parse_price(hidden.get("value")) if hidden else None
 
 
+def find_image(soup: BeautifulSoup) -> str | None:
+    """The main product photo: its 300-pixel version, or the big one when that's a placeholder.
+
+    Books show theirs as #imgBlkFront. A missing photo is fine: the web app shows a placeholder.
+    """
+    photo = soup.select_one("#landingImage") or soup.select_one("#imgBlkFront")
+    if photo is None:
+        return None
+    return image_link(photo.get("src")) or image_link(photo.get("data-old-hires"))
+
+
 def parse_page(html: str) -> PageDetails:
     check_not_blocked(html)
     soup = BeautifulSoup(html, "html.parser")
@@ -113,4 +124,4 @@ def parse_page(html: str) -> PageDetails:
     if not price and not unavailable:
         raise ParseError("Found the product but not its price on the Amazon page.")
 
-    return PageDetails(title=title, price=price, in_stock=not unavailable)
+    return PageDetails(title=title, price=price, in_stock=not unavailable, image_url=find_image(soup))

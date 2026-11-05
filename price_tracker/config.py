@@ -19,7 +19,12 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 # Pages the fetcher could not read are saved here, so you can see what changed.
 DEBUG_DIR = PROJECT_DIR / "debug"
 
-# The database with your tracked products, their price history and alerts.
+# Local settings, like DATABASE_URL, as NAME=value lines (see envfile.py and
+# .env.example). It holds passwords, so it's in .gitignore.
+ENV_FILE = PROJECT_DIR / ".env"
+
+# The database with your tracked products, their price history and alerts,
+# when DATABASE_URL isn't set (in .env or the environment).
 DB_PATH = PROJECT_DIR / "price_tracker.db"
 
 # The built web UI (`npm run build` in web/), which `serve` shows at its address.
@@ -52,3 +57,19 @@ SEND_ALERTS_WITHIN_HOURS = 24
 
 # Wait between Telegram messages: it allows about one a second per chat.
 PAUSE_BETWEEN_MESSAGES = 1.0
+
+# A "Check now" in the web app skips a store page checked less than this many
+# minutes ago, to go easy on the stores: prices rarely change that fast.
+CHECK_AGAIN_AFTER_MINUTES = 5
+
+# Logins to the web app last this many days, or until you log out.
+LOGIN_DAYS = 30
+
+# After this many wrong passwords from one address within LOGIN_LOCK_MINUTES,
+# that address has to wait until the oldest of them is LOGIN_LOCK_MINUTES old.
+LOGIN_TRIES = 5
+LOGIN_LOCK_MINUTES = 15
+
+# Account rules. Passwords are only stored as a scrypt hash (see auth.py).
+MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_LENGTH = 200

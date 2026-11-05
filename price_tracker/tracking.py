@@ -8,7 +8,6 @@
             print(check.listing.site, check.product.price if check.product else check.error)
 """
 
-import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -86,16 +85,29 @@ def check(session: Session, listing: Listing, client: httpx.Client, now: datetim
 def check_listings(
     session: Session, listings: list[Listing], client: httpx.Client, now: datetime | None = None
 ) -> Iterator[Check]:
-    """Check these listings one by one, pausing in between, saving each result as it comes in."""
-    for number, listing in enumerate(listings):
-        if number:
-            time.sleep(config.PAUSE_BETWEEN_PRODUCTS)
+    """Check these listings one by one, saving each result as it comes in.
+
+    The fetcher pauses between store requests (config.PAUSE_BETWEEN_PRODUCTS).
+    """
+    for listing in listings:
         yield check(session, listing, client, now)
 
 
 def check_all(session: Session, client: httpx.Client, now: datetime | None = None) -> Iterator[Check]:
     """Check every listing of the active items."""
     return check_listings(session, db.listings_to_check(session), client, now)
+
+
+def wait_before_checking(listing: Listing, now: datetime) -> timedelta:
+    """How long until a "Check now" may fetch `listing` again: zero if it may now.
+
+    Fetching the same page again within config.CHECK_AGAIN_AFTER_MINUTES of the
+    last try only bothers the store: prices rarely change that fast.
+    """
+    if listing.last_checked_at is None:
+        return timedelta(0)
+    ready = listing.last_checked_at + timedelta(minutes=config.CHECK_AGAIN_AFTER_MINUTES)
+    return max(ready - now, timedelta(0))
 
 
 def set_target(session: Session, item_id: int, target: Decimal | None) -> Item:

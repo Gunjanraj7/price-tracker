@@ -1,0 +1,128 @@
+/* Colors, shadows and sizes, as roles, for the light and dark themes. */
+
+/* Price Tracker: Amazon's navy bar and yellow buttons, Flipkart's blue strip
+   and green "% off", on a light grey shop floor. Colors are roles, set once per
+   theme. Store colors: Amazon orange and Flipkart blue, which color-blind
+   readers can still tell apart. */
+
+:root {
+  color-scheme: light;
+  --navy: #131921;
+  --navy-2: #232f3e;
+  --amazon-orange: #ff9900;
+  --search-button: #febd69;
+  --search-button-hover: #f3a847;
+  --yellow: #ffd814;
+  --yellow-border: #fcd200;
+  --yellow-hover: #f7ca00;
+  --fk-blue: #2874f0;
+  --fk-blue-hover: #1e63d6;
+  --fk-yellow: #ffe11b;
+  --deal-red: #cc0c39;
+
+  --page: #f1f3f6;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --sunk: #eceff3;
+  --text: #0f1111;
+  --text-2: #3d4451;
+  --muted: #5f6873;
+  --border: #dde1e6;
+  --border-strong: #c2c8d0;
+  --link: #1f5fd1;
+  --link-hover: #c7511f;
+  --focus: #2874f0;
+  --good: #067d45;
+  --good-wash: #e3f4e9;
+  --bad: #b12704;
+  --bad-wash: #fdece8;
+  --warn-wash: #fff5e1;
+  --warn-border: #f2c46d;
+  --info-wash: #e8f0fe;
+  --info: #1d4fb8;
+  --grid: #e3e6ea;
+  --axis: #c6cbd2;
+  --series-amazon: #e47911;
+  --series-flipkart: #2874f0;
+  --subnav: #2874f0;
+  --chip-ring: transparent;
+  --placeholder: linear-gradient(135deg, #fff1db, #e3edff);
+  --shadow: 0 1px 2px rgba(15, 17, 17, 0.06), 0 2px 6px rgba(15, 17, 17, 0.05);
+  --shadow-lift: 0 12px 28px rgba(15, 17, 17, 0.14);
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0b0f15;
+  --surface: #141a22;
+  --surface-2: #1a222c;
+  --sunk: #1f2833;
+  --text: #e8edf3;
+  --text-2: #c3cbd5;
+  --muted: #95a0ad;
+  --border: #252f3d;
+  --border-strong: #384457;
+  --link: #74a9ff;
+  --link-hover: #ffb057;
+  --focus: #74a9ff;
+  --good: #46d18e;
+  --good-wash: rgba(70, 209, 142, 0.13);
+  --bad: #ff8a75;
+  --bad-wash: rgba(255, 138, 117, 0.13);
+  --warn-wash: rgba(255, 184, 61, 0.12);
+  --warn-border: rgba(255, 184, 61, 0.45);
+  --info-wash: rgba(116, 169, 255, 0.14);
+  --info: #9cc1ff;
+  --grid: #222b37;
+  --axis: #344052;
+  --series-amazon: #ffa53d;
+  --series-flipkart: #6aa5ff;
+  --subnav: #1f5fc6;
+  --chip-ring: rgba(255, 153, 0, 0.45);
+  --placeholder: linear-gradient(135deg, #2b2418, #16233a);
+  --shadow: none;
+  --shadow-lift: 0 12px 28px rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0b0f15;
+    --surface: #141a22;
+    --surface-2: #1a222c;
+    --sunk: #1f2833;
+    --text: #e8edf3;
+    --text-2: #c3cbd5;
+    --muted: #95a0ad;
+    --border: #252f3d;
+    --border-strong: #384457;
+    --link: #74a9ff;
+    --link-hover: #ffb057;
+    --focus: #74a9ff;
+    --good: #46d18e;
+    --good-wash: rgba(70, 209, 142, 0.13);
+    --bad: #ff8a75;
+    --bad-wash: rgba(255, 138, 117, 0.13);
+    --warn-wash: rgba(255, 184, 61, 0.12);
+    --warn-border: rgba(255, 184, 61, 0.45);
+    --info-wash: rgba(116, 169, 255, 0.14);
+    --info: #9cc1ff;
+    --grid: #222b37;
+    --axis: #344052;
+    --series-amazon: #ffa53d;
+    --series-flipkart: #6aa5ff;
+    --subnav: #1f5fc6;
+    --chip-ring: rgba(255, 153, 0, 0.45);
+    --placeholder: linear-gradient(135deg, #2b2418, #16233a);
+    --shadow: none;
+    --shadow-lift: 0 12px 28px rgba(0, 0, 0, 0.55);
+  }
+}

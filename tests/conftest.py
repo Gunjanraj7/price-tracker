@@ -3,20 +3,69 @@
 All tests are offline: they use the small sample pages in tests/pages,
 which copy the structure of real Amazon.in and Flipkart pages (checked
 November 2026), cut down to the parts the fetcher reads.
+
+Each test that needs a database gets a new SQLite file. `pytest --postgres`
+runs them on PostgreSQL instead, in the database TEST_DATABASE_URL names
+(from the environment or .env), which they wipe: its name must end in _test.
 """
 
 import json
+import os
 import subprocess
 from decimal import Decimal
 from pathlib import Path
 
 import httpx
 import pytest
+from sqlalchemy import create_engine, make_url, text
 
-from price_tracker import config, notify, scheduler, tracking
+from price_tracker import auth, config, db, envfile, notify, scheduler, tracking
 from price_tracker.models import ProductInfo
 
 PAGES = Path(__file__).parent / "pages"
+REAL_ENV_FILE = config.ENV_FILE     # before any test replaces it
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--postgres",
+        action="store_true",
+        help="run the database tests on PostgreSQL, in the database TEST_DATABASE_URL names "
+        "(from the environment or .env). They wipe it, so its name must end in _test.",
+    )
+
+
+@pytest.fixture(scope="session")
+def postgres_url(request) -> str | None:
+    """With --postgres, the URL of the PostgreSQL database the tests may wipe."""
+    if not request.config.getoption("--postgres"):
+        return None
+    url = os.environ.get("TEST_DATABASE_URL") or envfile.read(REAL_ENV_FILE).get("TEST_DATABASE_URL")
+    if not url:
+        pytest.exit("--postgres needs TEST_DATABASE_URL, in the environment or in .env.", returncode=4)
+    if not (make_url(url).database or "").endswith("_test"):
+        pytest.exit("TEST_DATABASE_URL must name a database ending in _test: the tests wipe it.", returncode=4)
+    return url
+
+
+@pytest.fixture
+def database_url(postgres_url, tmp_path) -> str:
+    """A new, empty database for one test: a SQLite file, or with --postgres the test database, wiped."""
+    if postgres_url is None:
+        return f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
+    engine = create_engine(postgres_url)
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+    engine.dispose()
+    return postgres_url
+
+
+@pytest.fixture
+def session(database_url):
+    """A session on a new database, with the tables made."""
+    with db.connect(database_url) as session:
+        yield session
 
 
 @pytest.fixture
@@ -51,16 +100,25 @@ def store(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def no_waiting(monkeypatch):
-    """Never sleep between retries in tests."""
+    """Never sleep between retries in tests, or wait before checking a price again."""
     monkeypatch.setattr(config, "RETRY_DELAY", 0)
     monkeypatch.setattr(config, "PAUSE_BETWEEN_PRODUCTS", 0)
     monkeypatch.setattr(config, "PAUSE_BETWEEN_MESSAGES", 0)
+    monkeypatch.setattr(config, "CHECK_AGAIN_AFTER_MINUTES", 0)
 
 
 @pytest.fixture(autouse=True)
-def no_real_database(monkeypatch):
-    """Tests never use a database set in DATABASE_URL; each makes its own."""
+def no_real_database(monkeypatch, tmp_path):
+    """Tests never use the real database, from DATABASE_URL, .env or price_tracker.db; each makes its own."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(config, "ENV_FILE", tmp_path / "no.env")
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "price_tracker.db")
+
+
+@pytest.fixture(autouse=True)
+def quick_passwords(monkeypatch):
+    """Hash passwords with a tiny scrypt cost, so tests that log in stay fast."""
+    monkeypatch.setattr(auth, "SCRYPT_COST", 2**4)
 
 
 @pytest.fixture(autouse=True)

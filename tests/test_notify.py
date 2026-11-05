@@ -15,12 +15,6 @@ START = datetime(2026, 11, 4, 3, 30, tzinfo=timezone.utc)
 HOUR = timedelta(hours=1)
 
 
-@pytest.fixture
-def session():
-    with db.connect("sqlite://") as session:
-        yield session
-
-
 def make_alerts(session, *moments):
     """Save an alert made at each of `moments`, and return their ids."""
     product = ProductInfo("amazon", "B0D3DK779N", AMAZON, "Earbuds", Decimal("999"), "INR", True)

@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from ..errors import ParseError, UnsupportedSite
 from ..models import PageDetails
 from ..prices import parse_price
-from .common import check_not_blocked, from_json_ld, select_text
+from .common import check_not_blocked, from_json_ld, image_link, select_text
 
 NAME = "flipkart"
 DOMAIN = "flipkart.com"
@@ -79,6 +79,9 @@ def parse_page(html: str) -> PageDetails:
     elif not price:
         raise ParseError("Found the product but not its price on the Flipkart page.")
 
+    # The schema.org block's "image" entries are offer banners; og:image is the product's photo.
+    og_image = soup.find("meta", property="og:image")
+
     return PageDetails(
         title=json_ld.get("title") or _title(soup),
         price=price,
@@ -86,4 +89,5 @@ def parse_page(html: str) -> PageDetails:
         currency=json_ld.get("currency", "INR"),
         # Links without a pid open the default colour/size; this is its pid.
         product_id=pid.group(1) if pid else None,
+        image_url=image_link(og_image.get("content")) if og_image else None,
     )

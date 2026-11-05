@@ -13,6 +13,21 @@ def test_reads_price_to_pay_not_mrp_or_other_products(page):
     assert result.in_stock is True
 
 
+def test_reads_the_product_photo(page):
+    html = page("amazon_product.html")
+    assert parse_page(html).image_url == "https://m.media-amazon.com/images/I/31wu8gbDFYL._SY300_SX300_QL70_ML2_.jpg"
+
+    # A placeholder in src: use the big photo instead.
+    placeholder = html.replace(
+        'src="https://m.media-amazon.com/images/I/31wu8gbDFYL._SY300_SX300_QL70_ML2_.jpg"', 'src="data:image/gif;base64,R0lGOD"'
+    )
+    assert parse_page(placeholder).image_url == "https://m.media-amazon.com/images/I/71h8UA-BVvL._SL1500_.jpg"
+
+
+def test_a_page_without_a_photo_is_fine(page):
+    assert parse_page(page("amazon_buy_box.html")).image_url is None
+
+
 def test_reads_buy_box_price(page):
     assert parse_page(page("amazon_buy_box.html")).price == Decimal("470.50")
 

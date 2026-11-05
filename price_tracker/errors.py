@@ -16,6 +16,30 @@ class AlreadyTracked(TrackingError):
     """The product is tracked already."""
 
 
+class TooSoon(Exception):
+    """Asked again too soon, like a price checked a moment ago. `seconds` says how long to wait."""
+
+    def __init__(self, message: str, seconds: int):
+        super().__init__(message)
+        self.seconds = seconds
+
+
+class LoginError(Exception):
+    """Base class for login problems."""
+
+
+class NotLoggedIn(LoginError):
+    """The request needs a login, and there's none (or it expired)."""
+
+
+class WrongPassword(LoginError):
+    """The username or the password is wrong."""
+
+
+class AccountError(Exception):
+    """An account can't be made or changed, like a username that's taken or a password that's too short."""
+
+
 class NotifyError(Exception):
     """An alert could not be sent, or Telegram isn't set up right."""
 

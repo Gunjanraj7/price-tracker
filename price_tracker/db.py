@@ -1,7 +1,7 @@
 """Opening the database, and the queries the rest of the app uses.
 
-The database is SQLite by default (config.DB_PATH). Set the DATABASE_URL
-environment variable to use another one, e.g. PostgreSQL:
+The database is SQLite by default (config.DB_PATH). Set DATABASE_URL, in the
+project's .env file or the environment, to use another one, e.g. PostgreSQL:
     postgresql+psycopg://user:password@host/dbname
 
 connect() brings the tables up to date with Alembic migrations (in
@@ -19,7 +19,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config as AlembicConfig
-from sqlalchemy import URL, Engine, create_engine, event, select
+from sqlalchemy import URL, Engine, create_engine, event, make_url, select
 from sqlalchemy.orm import Session, joinedload, selectinload, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -33,6 +33,15 @@ URL_VARIABLE = "DATABASE_URL"
 def database_url() -> str | URL:
     """DATABASE_URL if it's set, otherwise the SQLite file config.DB_PATH."""
     return os.environ.get(URL_VARIABLE, "").strip() or URL.create("sqlite", database=str(config.DB_PATH))
+
+
+def describe(url: str | URL | None = None) -> str:
+    """Which database `url` (database_url() by default) is, for people, without its password."""
+    url = make_url(database_url() if url is None else url)
+    if url.get_backend_name() == "sqlite":
+        return f"SQLite, {url.database or 'in memory'}"
+    name = {"postgresql": "PostgreSQL"}.get(url.get_backend_name(), url.get_backend_name())
+    return f"{name}, {url.render_as_string(hide_password=True)}"
 
 
 def make_engine(url: str | URL | None = None, upgrade: bool = True) -> Engine:
@@ -129,6 +138,7 @@ def add_listing(session: Session, item: Item, product: ProductInfo, now: datetim
         product_id=product.product_id,
         url=product.url,
         title=product.title,
+        image_url=product.image_url,
         currency=product.currency,
         created_at=now,
     )
@@ -154,6 +164,8 @@ def record_price(session: Session, listing: Listing, product: ProductInfo, now: 
     session.add(PriceCheck(listing_id=listing.id, price=product.price, in_stock=product.in_stock, checked_at=now))
     if product.title:
         listing.title = product.title
+    if product.image_url:
+        listing.image_url = product.image_url
     listing.last_price = product.price
     listing.last_in_stock = product.in_stock
     listing.last_checked_at = now

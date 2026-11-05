@@ -14,12 +14,6 @@ START = datetime(2026, 11, 4, 3, 30, tzinfo=timezone.utc)   # 9 AM in India
 HALF_DAY = timedelta(hours=12)
 
 
-@pytest.fixture
-def session():
-    with db.connect("sqlite://") as session:
-        yield session
-
-
 def check_at(session, moment):
     """Check everything as if it were `moment`, and return the alert messages."""
     return [message for result in tracking.check_all(session, None, now=moment) for message in result.alerts]

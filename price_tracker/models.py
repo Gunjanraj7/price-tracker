@@ -4,10 +4,12 @@ The tables are SQLAlchemy models, so the same code runs on SQLite (the default)
 and PostgreSQL. Changing them needs a migration too: see "Changing the tables"
 in the README.
 
-    items          what you track: a name and an optional target price
-    listings       an item's page on one store; an item has one per store
-    price_history  one row for every successful check of a listing
-    alerts         the alerts made so far, so the same one isn't repeated
+    items           what you track: a name and an optional target price
+    listings        an item's page on one store; an item has one per store
+    price_history   one row for every successful check of a listing
+    alerts          the alerts made so far, so the same one isn't repeated
+    users           the accounts that can log in to the web app
+    login_sessions  the browsers that are logged in
 """
 
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ class PageDetails:
     in_stock: bool                  # False when sold out or no seller is offering it
     currency: str = "INR"
     product_id: str | None = None   # set when the page knows the exact product better than the link
+    image_url: str | None = None    # the product's photo (https), when the page has one
 
 
 @dataclass
@@ -41,6 +44,7 @@ class ProductInfo:
     price: Decimal | None   # None when the product can't be bought right now
     currency: str
     in_stock: bool          # False when sold out or no seller is offering it
+    image_url: str | None = None    # the product's photo (https), when the page has one
 
 
 class Money(TypeDecorator):
@@ -121,6 +125,7 @@ class Listing(Base):
     product_id: Mapped[str] = mapped_column(Text)                   # ASIN for Amazon, pid for Flipkart
     url: Mapped[str] = mapped_column(Text)
     title: Mapped[str | None] = mapped_column(Text)                 # the store's title, updated on every check
+    image_url: Mapped[str | None] = mapped_column(Text)             # the store's photo of it, updated on every check
     currency: Mapped[str] = mapped_column(Text)
     last_price: Mapped[Decimal | None] = mapped_column(Money)       # None when it couldn't be bought at the last check
     last_in_stock: Mapped[bool | None]
@@ -159,3 +164,32 @@ class Alert(Base):
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)  # None until it's sent to Telegram
 
     listing: Mapped[Listing] = relationship()
+
+
+class User(Base):
+    """An account that can log in to the web app. Made with `python -m price_tracker user add NAME`."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(Text, unique=True)       # always lowercase
+    password_hash: Mapped[str] = mapped_column(Text)               # a scrypt hash (see auth.py), never the password
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class LoginSession(Base):
+    """A browser that's logged in.
+
+    Its cookie holds a random token; this keeps only the token's SHA-256 hash,
+    so the table can't be used to log in. Logging out deletes the row.
+    """
+
+    __tablename__ = "login_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+    user: Mapped[User] = relationship()
