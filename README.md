@@ -7,6 +7,9 @@
 Paste an Amazon.in or Flipkart link, tell it what you'd like to pay,
 and get a Telegram ping when it's actually a good time to buy.
 
+[![Tests](https://github.com/Gunjanraj7/price-tracker/actions/workflows/tests.yml/badge.svg)](https://github.com/Gunjanraj7/price-tracker/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<br>
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -260,6 +263,8 @@ cd web; npm test                                 # the dashboard's tests
 
 The tests are offline: sample store pages, a fake Telegram and a fake Task
 Scheduler. They never touch your real database, `.env`, bot or scheduled tasks.
+GitHub Actions runs all of them on every push, on Python 3.12 and 3.14 and on
+both databases ([the workflow](.github/workflows/tests.yml)).
 `--postgres` uses `TEST_DATABASE_URL` and wipes that database before each test,
 so give it a database of its own:
 `CREATE DATABASE price_tracker_test OWNER price_tracker;`
@@ -348,11 +353,15 @@ copy the page into `tests/pages/` as a new test.
 
 ## What's next
 
+- [x] Run the tests on every push with GitHub Actions
 - [ ] Put it online: a hosted PostgreSQL, HTTPS, and the daily checks on the server
-- [ ] Run the tests on every push with GitHub Actions
 - [ ] Change your password from the web page
 - [ ] Separate lists for several people
 - [ ] More stores
+
+## License
+
+[MIT](LICENSE): use it, change it, share it; just keep the copyright notice.
 
 ---
 
