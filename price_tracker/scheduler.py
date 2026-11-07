@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import date, datetime, time, timedelta
-from pathlib import Path
+from pathlib import Path, PurePath
 from xml.sax.saxutils import escape
 
 from . import config
@@ -50,7 +50,7 @@ def next_run(times: list[time], now: datetime) -> datetime:
     )
 
 
-def task_xml(times: list[time], python: Path, project_dir: Path, start: date) -> str:
+def task_xml(times: list[time], python: PurePath, project_dir: PurePath, start: date) -> str:
     """The task's definition, in Task Scheduler's XML format."""
     triggers = "".join(
         f"""

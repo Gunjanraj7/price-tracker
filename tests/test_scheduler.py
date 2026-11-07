@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, time
-from pathlib import Path
+from pathlib import PureWindowsPath
 
 import pytest
 
@@ -41,7 +41,7 @@ def test_next_run(now, expected):
 
 
 def test_task_runs_the_check_without_a_window_at_each_time():
-    project = Path(r"C:\Users\A & B\price-tracker")
+    project = PureWindowsPath(r"C:\Users\A & B\price-tracker")     # Windows paths, even when the tests run elsewhere
     xml = scheduler.task_xml([EVENING, MORNING], project / r".venv\Scripts\pythonw.exe", project, date(2026, 11, 5))
     task = ET.fromstring(xml.encode("utf-16"))
 
